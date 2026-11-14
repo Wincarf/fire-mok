@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import maplibregl from "maplibre-gl";
+import type { Vis } from "./vis";
 
 const CENTER: [number, number] = [-51.15, -30.05];
 const GRAY = "rescale=-30,0";
@@ -61,7 +62,6 @@ const base: maplibregl.StyleSpecification = {
   ],
 };
 
-type Vis = { flood: boolean; mask: boolean; sus: boolean; muni: boolean };
 const show = (on: boolean) => (on ? "visible" : "none");
 
 function styleFor(side: "before" | "after", thresh: number, vis: Vis): maplibregl.StyleSpecification {
