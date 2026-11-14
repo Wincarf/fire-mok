@@ -160,7 +160,7 @@ def main() -> int:
         for thr in THRESHOLDS:
             m = np.mean([r[3] for r in results if r[2] == thr])
             lines.append(f"| {thr} | {m:.1f} |")
-    report.write_text("\n".join(lines) + "\n")
+    report.write_text("\n".join(lines) + "\n", encoding="utf-8")
     logger.info("report -> %s", report)
     return 0
 
