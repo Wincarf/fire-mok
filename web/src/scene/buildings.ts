@@ -82,26 +82,20 @@ export function buildBuildingsMesh(
   const geo = new T.BoxGeometry(1, 1, 1);
   geo.translate(0, 0.5, 0); // base at y=0, scale h lifts the top
   const mat = new T.MeshStandardMaterial({
-    color: "#2a3140",
-    roughness: 0.85,
-    metalness: 0.1,
-    emissive: emissiveWindows ? new T.Color("#ffb36b") : new T.Color("#000"),
-    emissiveIntensity: emissiveWindows ? 0.12 : 0,
+    color: "#141c28", // dark urban mass — city lights come from windows
+    roughness: 0.9,
+    metalness: 0.05,
+    emissive: emissiveWindows ? new T.Color("#3a4f66") : new T.Color("#000"),
+    emissiveIntensity: emissiveWindows ? 0.35 : 0,
   });
   const mesh = new T.InstancedMesh(geo, mat, buildings.length);
   const m = new T.Matrix4();
-  const rng = seeded(7);
   buildings.forEach((b, i) => {
-    const h = b.h * (0.85 + rng() * 0.3); // slight height jitter reads better instanced
-    m.makeScale(b.w, h, b.d).setPosition(b.cx, 0, b.cz);
+    // footprints read as urban mass, not needles: x2 footprint, modest height
+    m.makeScale(b.w * 2, b.h, b.d * 2).setPosition(b.cx, 0, b.cz);
     mesh.setMatrixAt(i, m);
   });
   mesh.castShadow = true;
   mesh.receiveShadow = true;
   return mesh;
-}
-
-function seeded(seed: number) {
-  let s = seed >>> 0;
-  return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 0xffffffff);
 }

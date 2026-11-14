@@ -13,6 +13,7 @@ export default function CinematicMode({ onExit }: { onExit: () => void }) {
   const [note, setNote] = useState<string | null>(null);
   const [chapter, setChapter] = useState<number | null>(null);
   const [shooting, setShooting] = useState(false);
+  const [stats, setStats] = useState<{ floodKm2: number; floodPct: number } | null>(null);
 
   useEffect(() => {
     let dead = false;
@@ -27,8 +28,15 @@ export default function CinematicMode({ onExit }: { onExit: () => void }) {
           return;
         }
         worldRef.current = world;
+        setStats(world.stats);
         setStatus("ready");
-        // buildings are nice-to-have — fetch in background, degrade quietly
+        // risk prisms + buildings are nice-to-have — fetch in background
+        import("../scene/risk").then(async (r) => {
+          const fc = await r.fetchMunicipalities();
+          if (dead || !fc) return;
+          const T = await import("three");
+          if (!dead) world.addObject(r.buildRiskPrisms(T, r.riskShapes(fc, world.origin), world.elevAt));
+        });
         import("../scene/buildings").then(async (b) => {
           const list = await b.fetchBuildings(data.meta.bounds, world.origin);
           if (dead) return;
@@ -135,6 +143,20 @@ export default function CinematicMode({ onExit }: { onExit: () => void }) {
 
       {status === "ready" && (
         <>
+          {/* real flood quantification — same mask that paints the water */}
+          {stats && (
+            <div className="absolute top-6 left-4 flex flex-col gap-1.5">
+              <div className="px-3 py-1.5 rounded bg-surface-container-lowest/80 backdrop-blur-md border border-outline-variant font-label-mono-xs text-[11px] text-on-surface flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-primary" />
+                {stats.floodKm2.toFixed(0)} KM² SOB ÁGUA · {stats.floodPct.toFixed(1)}% DA AOI
+              </div>
+              <div className="px-3 py-1.5 rounded bg-surface-container-lowest/80 backdrop-blur-md border border-outline-variant font-label-mono-xs text-[10px] text-outline flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-sm" style={{ background: "linear-gradient(90deg,#c9b458,#d94f3d,#ff2d55)" }} />
+                PRISMAS = RISCO MUNICIPAL (ALTURA × ÍNDICE)
+              </div>
+            </div>
+          )}
+
           {chapter !== null && (
             <div className="absolute top-6 inset-x-0 flex justify-center pointer-events-none">
               <div className="px-4 py-2 rounded bg-surface-container-lowest/80 backdrop-blur-md border border-outline-variant">

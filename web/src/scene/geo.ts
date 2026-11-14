@@ -19,10 +19,10 @@ export function decodeHeightmap(buf: ArrayBuffer, nx: number, ny: number): Float
   return new Float32Array(buf);
 }
 
-// elevation-driven terrain palette (linear RGB ramps)
-const C_LOW = [0.137, 0.157, 0.122]; // #23281f wet lowland
-const C_MID = [0.29, 0.31, 0.227]; // #4a4f3a olive
-const C_HIGH = [0.353, 0.392, 0.439]; // #5a6470 slate
+// elevation-driven terrain palette (linear RGB ramps) — dark slate "map"
+const C_LOW = [0.051, 0.086, 0.118]; // #0d161e deep basin
+const C_MID = [0.118, 0.176, 0.235]; // #1e2d3c slate
+const C_HIGH = [0.298, 0.392, 0.478]; // #4c647a pale ridge
 
 function elevColor(t: number, out: [number, number, number]) {
   const k = Math.min(1, Math.max(0, t)) * 2;

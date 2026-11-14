@@ -29,6 +29,8 @@ export async function loadSceneData(): Promise<SceneData> {
 export type World = {
   extent: { w: number; d: number; maxH: number };
   origin: { lng: number; lat: number };
+  stats: { floodKm2: number; floodPct: number };
+  elevAt(x: number, z: number): number;
   resize(w: number, h: number): void;
   flyTo(pos: [number, number, number], look: [number, number, number], ms: number): void;
   addObject(obj: unknown): void;
@@ -68,6 +70,23 @@ export async function createWorld(canvas: HTMLCanvasElement, data: SceneData): P
   for (const v of data.elev) if (v > maxH) maxH = v;
   const extent = { w: nx * cell, d: ny * cell, maxH: maxH * exag };
 
+  let flooded = 0;
+  for (const v of data.mask) if (v === 1) flooded++;
+  const cellKm2 = (cell / 1000) ** 2;
+  const stats = {
+    floodKm2: flooded * cellKm2,
+    floodPct: (flooded / data.mask.length) * 100,
+  };
+
+  // bilinear-free grid sample — good enough for prism base height
+  const x0 = ((nx - 1) * cell) / 2;
+  const z0 = ((ny - 1) * cell) / 2;
+  const elevAt = (x: number, z: number): number => {
+    const i = Math.min(nx - 1, Math.max(0, Math.round((x + x0) / cell)));
+    const j = Math.min(ny - 1, Math.max(0, Math.round((z0 - z) / cell)));
+    return data.elev[j * nx + i] * exag;
+  };
+
   const terrain = buildTerrain(T, buildTerrainArrays(data.elev, nx, ny, cell, exag));
   scene.add(terrain);
 
@@ -78,8 +97,9 @@ export async function createWorld(canvas: HTMLCanvasElement, data: SceneData): P
   const composer: EffectComposer = await buildPost(T, renderer, scene, camera);
   const rig = await createRig(T, camera, canvas);
 
-  camera.position.set(-extent.w * 0.25, extent.maxH * 8 + 9000, -extent.d * 0.85);
-  rig.target.set(0, extent.maxH * 0.4, 0);
+  // opening shot: low oblique from the south-west, flood basin centered
+  camera.position.set(-extent.w * 0.18, extent.maxH * 3 + 5500, -extent.d * 0.55);
+  rig.target.set(extent.w * 0.06, extent.maxH * 0.5, extent.d * 0.02);
   rig.update();
 
   // flight tween — applied inside the RAF loop so damping stays smooth
@@ -109,6 +129,8 @@ export async function createWorld(canvas: HTMLCanvasElement, data: SceneData): P
   return {
     extent,
     origin,
+    stats,
+    elevAt,
     resize(w, h) {
       camera.aspect = w / h;
       camera.updateProjectionMatrix();

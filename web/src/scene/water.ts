@@ -17,7 +17,7 @@ void main() {
 const FRAG = /* glsl */ `
 uniform sampler2D uMask;
 uniform float uTime;
-uniform vec3 uDeep, uShallow, uSun, uSky;
+uniform vec3 uDeep, uShallow, uSky, uSunDir;
 uniform vec2 uTexel;
 varying vec2 vUv;
 varying vec3 vPos;
@@ -56,15 +56,15 @@ void main() {
   vec3 col = mix(uDeep, uShallow, 0.25);
   col = mix(col, uSky, fres * 0.75);
 
-  vec3 hv = normalize(viewDir + uSun);
+  vec3 hv = normalize(viewDir + uSunDir);
   float spec = pow(max(dot(n, hv), 0.0), 90.0) * 1.4;
-  col += uSun * spec;
+  col += vec3(1.0, 0.85, 0.6) * spec;
 
   // slow drifting foam sparkle
   float sparkle = sin(dot(vPos.xz, vec2(0.4, 0.33)) + uTime * 2.0) * 0.5 + 0.5;
-  col = mix(col, vec3(0.85, 0.92, 0.95), clamp(foam * (0.4 + sparkle * 0.4), 0.0, 0.55));
+  col = mix(col, vec3(0.65, 0.92, 0.98), clamp(foam * (0.4 + sparkle * 0.4), 0.0, 0.55));
 
-  gl_FragColor = vec4(col, 0.82 + fres * 0.1);
+  gl_FragColor = vec4(col, 0.86 + fres * 0.1);
 }
 `;
 
@@ -98,10 +98,10 @@ export function buildWater(
     uniforms: {
       uMask: { value: maskTex },
       uTime: { value: 0 },
-      uDeep: { value: new T.Color("#0d2a3f") },
-      uShallow: { value: new T.Color("#3d6a85") },
-      uSun: { value: new T.Color("#ffb27a") },
-      uSky: { value: new T.Color("#a8bfcd") },
+      uDeep: { value: new T.Color("#07293d") },
+      uShallow: { value: new T.Color("#0e5a74") },
+      uSunDir: { value: new T.Vector3(-0.55, 0.22, 0.4).normalize() },
+      uSky: { value: new T.Color("#59b8d4") },
       uTexel: { value: new T.Vector2(1 / nx, 1 / ny) },
     },
   });
