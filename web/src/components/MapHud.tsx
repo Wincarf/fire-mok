@@ -9,6 +9,7 @@ type Props = {
   afterRef: RefObject<HTMLDivElement | null>;
   containerRef: RefObject<HTMLDivElement | null>;
   onDividerDown: (e: PointerEvent<HTMLDivElement>) => void;
+  onCinematic: () => void;
   children?: ReactNode;
 };
 
@@ -21,6 +22,7 @@ export function MapHud({
   afterRef,
   containerRef,
   onDividerDown,
+  onCinematic,
   children,
 }: Props) {
   return (
@@ -86,6 +88,14 @@ export function MapHud({
           className="w-9 h-9 rounded bg-surface-container-low hover:bg-surface-container-high border border-outline-variant text-on-surface hover:text-primary shadow-md flex items-center justify-center transition-colors"
         >
           <span className="material-symbols-outlined text-[18px]">remove</span>
+        </button>
+        <button
+          type="button"
+          onClick={onCinematic}
+          title="Modo cinemático 3D"
+          className="w-9 h-9 rounded bg-surface-container-low hover:bg-surface-container-high border border-outline-variant text-on-surface hover:text-primary shadow-md flex items-center justify-center transition-colors"
+        >
+          <span className="material-symbols-outlined text-[18px]">movie</span>
         </button>
       </div>
 

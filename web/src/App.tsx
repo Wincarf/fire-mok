@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, lazy, Suspense } from "react";
 import * as maplibregl from "maplibre-gl";
 import type { Vis } from "./vis";
 import { STORY, type Step } from "./story";
@@ -10,6 +10,8 @@ import { TriagePanel } from "./components/TriagePanel";
 import { Timeline } from "./components/Timeline";
 import { summarizeMunicipalities } from "./stats";
 import { sarSceneDate } from "./format";
+
+const CinematicMode = lazy(() => import("./components/CinematicMode"));
 
 async function downloadJson(url: string, filename: string) {
   try {
@@ -164,6 +166,7 @@ export default function App() {
   const [coords, setCoords] = useState<{ lng: number; lat: number } | null>(null);
   const [zoom, setZoom] = useState(9);
   const [floodOk, setFloodOk] = useState(false);
+  const [cine, setCine] = useState(false);
 
   const sel: Props | null =
     munis.find((f) => f.properties?.code === selCode)?.properties ?? null;
@@ -389,7 +392,13 @@ export default function App() {
             window.addEventListener("pointermove", move);
             window.addEventListener("pointerup", up);
           }}
+          onCinematic={() => setCine(true)}
         />
+        {cine && (
+          <Suspense fallback={null}>
+            <CinematicMode onExit={() => setCine(false)} />
+          </Suspense>
+        )}
         {sel && (
           <TriagePanel
             sel={sel}
