@@ -86,14 +86,8 @@ export default function CinematicMode({ onExit }: { onExit: () => void }) {
     const w = worldRef.current;
     if (!w || shooting) return;
     setShooting(true);
-    const blob = await w.exportStill(3840, 2160);
-    if (blob) {
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
-      a.download = `fire-mok-guaiba-${Date.now()}.png`;
-      a.click();
-      URL.revokeObjectURL(a.href);
-    }
+    const { exportPoster } = await import("../scene/poster");
+    if (!(await exportPoster(w))) setNote("export falhou — contexto WebGL indisponível");
     setShooting(false);
   };
 
