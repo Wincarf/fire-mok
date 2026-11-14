@@ -67,7 +67,42 @@ tile 22JDM. NDWI > 0,15 com máscara de nuvem SCL. Relatório completo:
 - −19 dB tem concordância maior mas subdetecta área útil; −17 dB é o
   compromisso escolhido. O slider do app deixa o gestor explorar esse trade-off.
 
-## 5. Limitações conhecidas
+## 5. Índice de risco municipal
+
+Score de triagem 0–1 por município, combinação linear ponderada de quatro
+componentes normalizados (implementação: `pipeline/pipeline/risk.py`):
+
+| Componente | Fonte | Normalização | Peso |
+|---|---|---|---|
+| Chuva máxima em 7 dias | Open-Meteo (precipitation_sum) | cap 300 mm | 0,30 |
+| Umidade do solo | Open-Meteo (soil_moisture_0_to_7cm) | cap 0,5 m³/m³ | 0,20 |
+| Terreno suscetível | Cop DEM GLO-30 (elev < 50 m E slope < 5°) | fração da área | 0,25 |
+| Inundação observada | Extento SAR (seção 3) | cap 15% da área | 0,25 |
+
+Categorias: `low` ≤ 0,25 · `moderate` ≤ 0,50 · `high` ≤ 0,75 · `critical` > 0,75.
+
+Calibração qualitativa contra mai/2024: Charqueadas (0,81) e Eldorado do Sul
+(0,75) saem `critical`; Triunfo, Nova Santa Rita, Porto Alegre e Canoas saem
+`high` — consistente com a geografia real do desastre. O índice é triagem,
+não previsão: pesos e caps estão fixos e documentados aqui, sem ajuste
+automático por evento.
+
+### Referências do método
+
+- Twele, A. et al. (2016/2018). *Unsupervised Rapid Flood Mapping Using
+  Sentinel-1 GRD SAR Images.* IEEE TGRS. doi:10.1109/tgrs.2018.2797536 —
+  detecção de água por limiar em σ0.
+- Clement, M. et al. (2018). *An automatic change detection approach for
+  rapid flood mapping in Sentinel-1 SAR data.* Int. J. Appl. Earth Obs.
+  doi:10.1016/j.jag.2018.05.023 — diferença antes/depois (nossa seção 3).
+- DeVries, B. et al. (2020). *Rapid Flood Mapping and Evaluation with a
+  Supervised Classifier and Change Detection.* Remote Sensing.
+  doi:10.3390/rs12132073 — validação contra referência óptica.
+
+(Recuperados via OpenAlex em 2026-11-14, consulta `search=Sentinel-1 flood
+mapping SAR` — recuperação parcial, 8 de 13.715 registros.)
+
+## 6. Limitações conhecidas
 
 1. Limiar fixo global — não usa Otsu/método adaptativo por cena (roadmap).
 2. Sem correção de ângulo de incidência — RTC já é gamma0, o que reduz o efeito.
@@ -75,7 +110,7 @@ tile 22JDM. NDWI > 0,15 com máscara de nuvem SCL. Relatório completo:
 4. Baseline é recessão, não pré-evento — ver ruling na seção 2.
 5. Resolução efetiva ~10–20 m: ruas estreitas alagadas ficam abaixo do pixel.
 
-## 6. Reprodutibilidade
+## 7. Reprodutibilidade
 
 ```bash
 cd pipeline
