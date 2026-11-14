@@ -13,6 +13,21 @@ num índice de risco municipal com plano de ação por regras rastreáveis.
 > Saídas do Fire Mok são um **score de triagem** para apoiar gestores,
 > não um alerta oficial de defesa civil.
 
+## Ver online (demo estática)
+
+O branch [`gh-pages`](https://github.com/Wincarf/fire-mok/tree/gh-pages) carrega
+uma versão estática completa do app: choropleth de risco, extento SAR real da
+enchente de 11/mai/2024, compare antes/depois, story e painéis municipais —
+sem backend, com os mesmos endpoints da API espelhados em arquivos
+(`/api/municipalities`, `/api/layers`, `/api/plan/{code}` e tiles
+pré-renderizados em z6–12).
+
+- URL: **https://wincarf.github.io/fire-mok/** (após ativar Pages em
+  *Settings → Pages → Deploy from a branch → gh-pages / root*)
+- Para regenerar: `cd web && npm run build -- --base=/fire-mok/` e depois
+  `cd pipeline && uv run python ../scripts/build_pages.py --dist ../web/dist
+  --out ../pages_site --data ../data` (dados em `data/` precisam existir).
+
 ## Arquitetura
 
 ```

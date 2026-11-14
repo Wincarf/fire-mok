@@ -11,6 +11,7 @@ Usage (from pipeline venv):
 
 import argparse
 import json
+import math
 import shutil
 import sys
 from pathlib import Path
@@ -44,22 +45,21 @@ def render_layer(name: str, rel: str, special: str | None, out_dir: Path, data: 
     cmap = FLOOD_CMAP if name == "flood_extent" else SUS_CMAP if name == "susceptibility" else None
     n = 0
     with COGReader(str(path)) as cog:
-        # clamp the tile sweep to AOI ∩ data bounds (scene footprints can be wider)
-        b = cog.bounds
+        # clamp the tile sweep to AOI ∩ data bounds (scene footprints can be
+        # wider); cog.bounds may be in a projected CRS — normalize to 4326 first
+        b = transform_bounds(cog.crs, "EPSG:4326", *cog.bounds, densify_pts=21)
         lo = (max(b[0], AOI_BBOX[0]), max(b[1], AOI_BBOX[1]), min(b[2], AOI_BBOX[2]), min(b[3], AOI_BBOX[3]))
         for z in Z_RANGE:
-            from rasterio.warp import transform_bounds as tb
-            w, s, e, nrt = tb("EPSG:4326", "EPSG:3857", *lo)
-            import math
-
+            # xy() converte lon/lat (4326) direto para índices de tile — sem
+            # passagem por 3857 (metros), que esvaziaria os ranges
             def xy(lon, lat, z):
                 x = (lon + 180.0) / 360.0 * 2**z
                 lr = math.radians(lat)
                 y = (1.0 - math.asinh(math.tan(lr)) / math.pi) / 2.0 * 2**z
                 return x, y
 
-            x0, y1 = xy(w, s, z)
-            x1, y0 = xy(e, nrt, z)
+            x0, y1 = xy(lo[0], lo[1], z)
+            x1, y0 = xy(lo[2], lo[3], z)
             for tx in range(max(0, int(x0)), min(2**z, int(x1) + 1)):
                 for ty in range(max(0, int(y0)), min(2**z, int(y1) + 1)):
                     try:
@@ -97,6 +97,17 @@ def main() -> int:
     # 1) built SPA (vite build --base=/fire-mok/)
     shutil.copytree(args.dist, out / "site")
     (out / ".nojekyll").write_text("")
+
+    # maplibre v6 resolves its worker via import.meta.url sibling URL — rollup
+    # emits the reference but not the file; copy it (and its shared chunk)
+    # from the package so the geojson pipeline works on static hosting
+    ng = args.dist.parent / "node_modules" / "maplibre-gl" / "dist"
+    assets = out / "site" / "assets"
+    for f in ("maplibre-gl-worker.mjs", "maplibre-gl-shared.mjs"):
+        src = ng / f
+        if src.exists():
+            shutil.copyfile(src, assets / f)
+            print(f"  assets/{f}: copiado")
 
     # 2) static vector endpoints (extensionless, same paths the app fetches)
     api = out / "site" / "api"
