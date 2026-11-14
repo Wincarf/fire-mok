@@ -71,7 +71,16 @@ function styleFor(vis: Vis, mode: "risk" | "before" | "after"): maplibregl.Style
       muni: { type: "geojson", data: "/api/municipalities" },
     },
     layers: [
-      { id: "osm", type: "raster", source: "osm" },
+      {
+        id: "osm",
+        type: "raster",
+        source: "osm",
+        // desaturated + dimmed so the risk fills read as data, not noise
+        paint: {
+          "raster-saturation": -0.7,
+          "raster-brightness-max": 0.85,
+        },
+      } as any,
       {
         id: "sus",
         type: "raster",
