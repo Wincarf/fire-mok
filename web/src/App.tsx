@@ -4,6 +4,7 @@ import type { Vis } from "./vis";
 import { STORY, type Step } from "./story";
 import { StoryOverlay } from "./components/StoryOverlay";
 import { summarizeMunicipalities } from "./stats";
+import { RISK_LABEL, ptRisk } from "./labels";
 
 const CENTER: [number, number] = [-51.15, -30.05];
 const GRAY = "rescale=-30,0";
@@ -129,12 +130,22 @@ export default function App() {
   const [plan, setPlan] = useState<any>(null);
   const [layers, setLayers] = useState<Vis>({ flood: true, mask: false, sus: false, muni: true });
   const layersRef = useRef(layers);
+  const threshRef = useRef(thresh);
+  const selCodeRef = useRef(selCode);
   const [split, setSplit] = useState(50);
   const [step, setStep] = useState<number | null>(0);
+  const [dragging, setDragging] = useState(false);
 
   const sel: Props | null =
     munis.find((f) => f.properties?.code === selCode)?.properties ?? null;
   const summary = summarizeMunicipalities(munis);
+
+  // leaving story mode lands on a useful dashboard, not a blank SAR view
+  const exitStory = () => {
+    setStep(null);
+    setLayers({ flood: true, mask: false, sus: false, muni: true });
+    setSplit(50);
+  };
 
   const applyVis = (m: maplibregl.Map, l: Vis) => {
     // only set when different — styledata refires on setLayoutProperty and
@@ -167,8 +178,15 @@ export default function App() {
 
     // re-apply toggles whenever a (re)loaded style finishes — the old effect
     // skipped silently while isStyleLoaded() was false and flood stayed hidden
-    m1.on("styledata", () => applyVis(m1, layersRef.current));
-    m2.on("styledata", () => applyVis(m2, layersRef.current));
+    const onStyleData = (m: maplibregl.Map) => {
+      applyVis(m, layersRef.current);
+      if (m.getLayer("muni-sel"))
+        m.setFilter("muni-sel", ["==", ["get", "code"], selCodeRef.current ?? "__none__"] as any);
+      const src = m.getSource("mask") as any;
+      if (src) src.setTiles([`/tiles/sar_after/{z}/{x}/{y}.png?expression=b1<${threshRef.current}&colormap=${FLOOD_CMAP}`]);
+    };
+    m1.on("styledata", () => onStyleData(m1));
+    m2.on("styledata", () => onStyleData(m2));
 
     // keep both maps in sync (replaces maplibre-gl-compare, which needs node "events")
     let syncing = false;
@@ -210,7 +228,7 @@ export default function App() {
     if (step === null) return;
     const s: Step = STORY[step];
     const m = afterMap.current;
-    if (m) m.flyTo({ center: [s.camera[0], s.camera[1]], zoom: s.camera[2] });
+    if (m) m.flyTo({ center: [s.camera[0], s.camera[1]], zoom: s.camera[2], bearing: 0, pitch: 0 });
     setLayers(s.layers);
     setSplit(s.split);
     setSelCode(s.sel ?? null);
@@ -218,11 +236,21 @@ export default function App() {
 
   useEffect(() => {
     if (!sel?.code) return setPlan(null);
-    fetch(`/api/plan/${sel.code}`).then((r) => (r.ok ? r.json() : null)).then(setPlan).catch(() => {});
+    let alive = true;
+    fetch(`/api/plan/${sel.code}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => alive && setPlan(d))
+      .catch(() => {});
+    return () => {
+      alive = false;
+      setPlan(null);
+    };
   }, [sel]);
 
-  // threshold -> update the after-mask tiles live
+  // threshold -> update the after-mask tiles live (styledata covers the
+  // still-loading case via threshRef)
   useEffect(() => {
+    threshRef.current = thresh;
     const m = afterMap.current;
     if (!m || !m.getSource("mask")) return;
     (m.getSource("mask") as any).setTiles([
@@ -235,6 +263,11 @@ export default function App() {
     layersRef.current = layers;
     for (const m of maps.current) if (m.isStyleLoaded()) applyVis(m, layers);
   }, [layers]);
+
+  // keep selCodeRef current so styledata can re-apply the highlight
+  useEffect(() => {
+    selCodeRef.current = selCode;
+  }, [selCode]);
 
   // highlight the selected municipality outline on both maps
   useEffect(() => {
@@ -287,24 +320,29 @@ export default function App() {
 
       <div ref={wrap} className="compare">
         <div ref={beforeRef} className="map" />
-        <div ref={afterRef} className={`map top${step !== null ? " anim" : ""}`} style={{ clipPath: `inset(0 0 0 ${split}%)` }} />
+        <div ref={afterRef} className={`map top${step !== null && !dragging ? " anim" : ""}`} style={{ clipPath: `inset(0 0 0 ${split}%)` }} />
         <div
-          className={`divider${step !== null ? " anim" : ""}`}
+          className={`divider${step !== null && !dragging ? " anim" : ""}`}
           style={{ left: `${split}%` }}
-          onMouseDown={(e) => {
+          onPointerDown={(e) => {
             e.preventDefault();
-            const move = (ev: MouseEvent) => {
+            setDragging(true);
+            const move = (ev: PointerEvent) => {
               const r = wrap.current!.getBoundingClientRect();
               setSplit(Math.min(100, Math.max(0, ((ev.clientX - r.left) / r.width) * 100)));
             };
-            const up = () => { window.removeEventListener("mousemove", move); window.removeEventListener("mouseup", up); };
-            window.addEventListener("mousemove", move);
-            window.addEventListener("mouseup", up);
+            const up = () => {
+              setDragging(false);
+              window.removeEventListener("pointermove", move);
+              window.removeEventListener("pointerup", up);
+            };
+            window.addEventListener("pointermove", move);
+            window.addEventListener("pointerup", up);
           }}
         />
-        <span className="tag left">ÁGUA NORMAL · jun/2024 (recessão)</span>
+        <span className="tag left">ÁGUA NORMAL · jun/2024</span>
         <span className="tag right">PICO DA CHEIA · 11/mai/2024</span>
-        {munis.length > 0 && (
+        {munis.length > 0 && step === null && (
           <div className="banner">
             <strong>~{summary.exposed.toLocaleString("pt-BR")}</strong> pessoas potencialmente
             afetadas · <strong>{summary.critical}</strong> municípios em risco crítico
@@ -318,8 +356,8 @@ export default function App() {
           total={STORY.length}
           step={STORY[step]}
           onPrev={() => setStep((s) => (s === null || s === 0 ? s : s - 1))}
-          onNext={() => setStep((s) => (s === null || s >= STORY.length - 1 ? null : s + 1))}
-          onSkip={() => setStep(null)}
+          onNext={() => setStep((s) => (s === null ? null : s >= STORY.length - 1 ? null : s + 1))}
+          onSkip={exitStory}
           onRestart={() => setStep(0)}
         />
       )}
@@ -333,7 +371,7 @@ export default function App() {
             <span>pessoas potencialmente afetadas</span>
           </p>
           <p className={`badge ${sel.risk_category}`}>
-            Risco {sel.risk_category} · {Number(sel.risk).toFixed(2)}
+            Risco {RISK_LABEL[sel.risk_category] ?? sel.risk_category} · índice {Number(sel.risk).toFixed(2)}
           </p>
           <ul className="stats">
             <li>População total: {Number(sel.population).toLocaleString("pt-BR")}</li>
@@ -344,9 +382,9 @@ export default function App() {
           </ul>
           {plan && (
             <>
-              <h3>Plano de ação ({plan.priority})</h3>
-              <ul className="reasons">{plan.reasons.map((r: string, i: number) => <li key={i}>{r}</li>)}</ul>
-              <ol className="actions">{plan.actions.map((a: string, i: number) => <li key={i}>{a}</li>)}</ol>
+              <h3>Plano de ação — prioridade {RISK_LABEL[plan.priority] ?? plan.priority}</h3>
+              <ul className="reasons">{plan.reasons.map((r: string, i: number) => <li key={i}>{ptRisk(r)}</li>)}</ul>
+              <ol className="actions">{plan.actions.map((a: string, i: number) => <li key={i}>{ptRisk(a)}</li>)}</ol>
             </>
           )}
         </aside>

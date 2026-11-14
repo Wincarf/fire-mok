@@ -6,7 +6,7 @@ export function summarizeMunicipalities(
   let critical = 0;
   for (const f of features) {
     const p = f?.properties ?? {};
-    if (typeof p.pop_exposed === "number") exposed += p.pop_exposed;
+    if (Number.isFinite(p.pop_exposed)) exposed += p.pop_exposed;
     if (p.risk_category === "critical") critical += 1;
   }
   return { exposed, critical };

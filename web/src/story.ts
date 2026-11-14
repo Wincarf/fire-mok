@@ -28,7 +28,7 @@ export const STORY: Step[] = [
   },
   {
     title: "Antes e depois",
-    text: "Compare os dois lados: à esquerda, a água normal de junho (recessão); à direita, o pico da enchente em 11 de maio. Água aparece escura no radar.",
+    text: "Compare os dois lados: à esquerda, a água em situação normal (junho); à direita, o pico da enchente em 11 de maio. Água aparece escura no radar.",
     camera: [-51.15, -30.05, 9],
     layers: OFF,
     split: 50,
