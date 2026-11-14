@@ -7,27 +7,27 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 Plataforma de monitoreo de inundaciones para Río Grande del Sur, Brasil.
-Caso ancla: la inundación de mayo de 2024 en la cuenca del Guaíba,
-detectada en SAR Sentinel-1 (y lista para NISAR), cruzada con territorio
-(IBGE), clima (Open-Meteo + NASA POWER), terreno (Copernicus DEM + HAND) y
-población (WorldPop) en un índice de riesgo municipal con un plan de acción
-cuyas reglas son rastreables hasta los datos.
+Caso ancla: la inundación de mayo de 2024 en la cuenca del Guaíba —
+detectada en SAR Sentinel-1 (lista para NISAR), cruzada con territorio
+(IBGE), clima (Open-Meteo + NASA POWER), terreno (Copernicus DEM + HAND)
+y población (WorldPop) en un índice de riesgo municipal con un plan de
+acción rastreable hasta los datos.
 
-> Los resultados de Fire Mok son una **puntuación de triaje** para apoyar a
-> los gestores, no una alerta oficial de defensa civil.
+> Los resultados de Fire Mok son una **puntuación de triaje** para apoyar
+> a los gestores, no una alerta oficial de defensa civil.
 
 ## Pruébalo en línea (demo estática)
 
-La rama [`gh-pages`](https://github.com/Wincarf/fire-mok/tree/gh-pages)
-aloja una versión estática completa de la aplicación: coropletas de riesgo,
-extensión SAR real de la inundación del 11/05/2024, comparación antes/después,
-historia guiada y paneles municipales — sin backend, con los mismos endpoints
-de la API reflejados como archivos (`/api/municipalities`, `/api/layers`,
-`/api/plan/{code}` y teselas pregeneradas en z6–12).
+App completa, sin backend — la rama [`gh-pages`](https://github.com/Wincarf/fire-mok/tree/gh-pages)
+sirve coropletas de riesgo, la extensión SAR real de la inundación del
+11/05/2024, comparación antes/después, historia guiada y paneles
+municipales. Los endpoints de la API se reflejan como archivos
+(`/api/municipalities`, `/api/layers`, `/api/plan/{code}`, teselas
+pregeneradas z6–12).
 
-- URL: **https://wincarf.github.io/fire-mok/** (tras activar Pages en
+- URL: **https://wincarf.github.io/fire-mok/** (activa Pages en
   *Settings → Pages → Deploy from a branch → gh-pages / root*)
-- Para regenerar: `cd web && npm run build -- --base=/fire-mok/` y luego
+- Regenerar: `cd web && npm run build -- --base=/fire-mok/` y luego
   `cd pipeline && uv run python ../scripts/build_pages.py --dist ../web/dist
   --out ../pages_site --data ../data` (los datos en `data/` deben existir).
 
@@ -64,8 +64,7 @@ cd ../web && npm install && npm run dev       # http://localhost:5173
 docker build -t fire-mok . && docker run -p 8000:8000 -v "$PWD/data:/app/data" fire-mok
 ```
 
-Todo el flujo anterior funciona sin credenciales de Earthdata (solo
-fuentes públicas).
+Solo fuentes públicas — sin credenciales de Earthdata.
 
 ## Monitoreo continuo
 
@@ -75,57 +74,36 @@ fuentes públicas).
   plan).
 - GitHub Actions lo ejecuta **a diario a las 09:00 (hora de Brasilia)**
   (`update-data.yml`) y publica la nueva extensión como artifact.
-- El índice de riesgo usa la **mayor** entre la lluvia observada en 7 días y
-  la lluvia **pronosticada** para los próximos 7 días (Open-Meteo forecast):
-  el componente pasa a mirar hacia adelante.
+- Lluvia con vista al futuro: el índice usa la **mayor** entre la lluvia
+  observada en los últimos 7 días y el **pronóstico** Open-Meteo de los
+  próximos 7 días.
 
 ## NISAR (banda de validación de la misión)
 
-`pipeline/scripts/validate_nisar.py` descarga una escena NISAR GCOV vía ASF
-DAAC y convierte HDF5 -> COG. Requiere
-`EARTHDATA_USERNAME`/`EARTHDATA_PASSWORD`; sin credenciales el script
-registra `skipped: no Earthdata creds` y termina con éxito. NISAR (banda L)
-y Sentinel-1 (banda C) viven en **capas separadas** — no son comparables por
-diferencia.
+`pipeline/scripts/validate_nisar.py` descarga una escena NISAR GCOV vía
+ASF DAAC y convierte HDF5 -> COG.
+
+- Requiere `EARTHDATA_USERNAME`/`EARTHDATA_PASSWORD`; sin credenciales el
+  script registra `skipped: no Earthdata creds` y termina con éxito.
+- NISAR (banda L) y Sentinel-1 (banda C) viven en **capas separadas** — no
+  comparables por diferencia.
 
 ## Validación
 
-- La extensión SAR se valida contra Sentinel-2 NDWI (con máscara SCL) en
-  **chips estratificados** (mitad con agua de inundación presente, mitad
-  seca): matriz de confusión, **F1, IoU y kappa de Cohen por umbral σ0, con
-  intervalo de confianza del 95% por bootstrap** entre chips. La escena
-  óptica se ordena por proximidad temporal a la escena SAR. Informe
-  regenerable: `uv run python scripts/validate_flood.py --chips 30`.
-- Piloto original (4 chips, 2024): acuerdo medio del 66,6% a −17 dB, hasta
-  79% en chips con inundación real — cifras del piloto, sin IC; el nuevo
-  informe las sustituye por métricas por clase + IC.
-- Los falsos positivos documentados (urbano, agua permanente) se **recortan
-  de la extensión** con ESA WorldCover 10 m (clases built-up y permanent
-  water).
-- `cd pipeline && uv run pytest tests/` — 87 tests; `api/tests/` con 9;
-  `web/` con 20 (vitest). CI ejecuta los tres en GitHub Actions.
-
-## Guion de demo (3 min)
-
-1. El mapa abre en el swipe: a la izquierda σ0 del 04/06/2024 (recesión), a
-   la derecha 11/05/2024 (pico). Arrastra el divisor — el Guaíba "se llena"
-   en pantalla.
-2. Activa "Water where it shouldn't be" — rojo = agua nueva detectada (ya
-   limpia de urbano y agua permanente).
-3. Mueve el deslizador σ0 (−25 → −10 dB): la máscara de agua cambia en vivo:
-   demuestra que el umbral es una decisión, no un número mágico.
-4. Haz clic en Eldorado do Sul o Charqueadas: riesgo `critical`, población
-   expuesta sumada desde la malla WorldPop sobre los píxeles inundados,
-   plan de acción con razones rastreables a los datos.
-5. Compara con Canoas/POA (`high`) y un municipio de sierra (`low`) — el
-   índice ordena la prioridad de gestión.
-
-## Honestidad / limitaciones
-
-Ver `docs/methodology.md`, sección 6: la línea base es recesión (no
-pre-evento), umbral global fijo, resolución ~10 m, WorldPop 2020 (no es el
-Censo 2022), HAND con umbral de triaje (no hidráulica), índice calibrado
-cualitativamente contra un único evento.
+- Extensión SAR validada contra Sentinel-2 NDWI (máscara SCL) en **chips
+  estratificados** (mitad con agua de inundación, mitad seca): matriz de
+  confusión, **F1, IoU y kappa de Cohen por umbral σ0, con IC del 95% por
+  bootstrap**. La escena óptica se ordena por proximidad temporal a la
+  escena SAR. Regenerar:
+  `uv run python scripts/validate_flood.py --chips 30`.
+- Piloto original (4 chips, 2024): 66,6% de acuerdo medio a −17 dB, hasta
+  79% en chips con inundación real — sustituido por el informe con
+  métricas por clase + IC.
+- Los falsos positivos documentados (urbano, agua permanente) se
+  **recortan de la extensión** con ESA WorldCover 10 m (clases built-up y
+  permanent water).
+- `cd pipeline && uv run pytest tests/` — 87 tests; `api/tests/` 9;
+  `web/` 20 (vitest). CI ejecuta los tres en GitHub Actions.
 
 ## Licencia
 
