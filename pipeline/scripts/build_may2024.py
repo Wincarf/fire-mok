@@ -16,6 +16,13 @@ from rasterio.warp import Resampling, reproject
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from pipeline.aoi import get_aoi
+from pipeline.masks import (
+    clean_flood_extent,
+    fetch_worldcover_for_bounds,
+    permanent_water_mask,
+    save_mask_cog,
+    urban_mask,
+)
 from pipeline.sar_process import process_scene
 from pipeline.sar_search import search_s1_rtc
 from pipeline.water import filter_min_area, flood_extent, mask_to_polygons, write_mask_cog
@@ -101,6 +108,21 @@ def main() -> int:
     flood = filter_min_area(flood, min_px=25)
     frac = float(np.nanmean(flood[~np.isnan(before_db)])) if (~np.isnan(before_db)).any() else 0.0
     logger.info("flood pixels: %d (%.2f%% of valid)", int(flood.sum()), 100 * frac)
+
+    # context masks (WorldCover): cut permanent-water and urban false positives
+    ctx_dir = DATA / "context"
+    try:
+        wc = fetch_worldcover_for_bounds(aoi.bbox, dst_transform, dst_crs, before_db.shape)
+        permanent, urban = permanent_water_mask(wc), urban_mask(wc)
+        save_mask_cog(permanent, profile, ctx_dir / "permanent_water_guaiba.tif")
+        save_mask_cog(urban, profile, ctx_dir / "urban_guaiba.tif")
+        flood, removed = clean_flood_extent(flood, permanent, urban)
+        logger.info(
+            "context cleaning: -%d permanent-water px, -%d urban px -> %d flood px",
+            removed["removed_permanent"], removed["removed_urban"], removed["after_px"],
+        )
+    except Exception as exc:  # masks are context, not core — never block the build
+        logger.warning("worldcover masks unavailable, extent NOT cleaned: %s", exc)
 
     flood_tif = write_mask_cog(flood, profile, sar_dir / "flood_extent_may2024.tif")
     polys = mask_to_polygons(flood, dst_transform, dst_crs)

@@ -13,7 +13,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app import create_app
 
-LAYERS = ["sar_before", "sar_after", "flood_extent", "susceptibility", "dem"]
+LAYERS = ["sar_before", "sar_after", "flood_extent", "permanent_water", "urban", "susceptibility", "dem"]
 
 
 def _tiny_cog(path: Path, val: float):
@@ -33,7 +33,8 @@ def client(tmp_path):
 
     rel = {
         "sar_before": "sar/b.tif", "sar_after": "sar/a.tif",
-        "flood_extent": "sar/f.tif", "susceptibility": "terrain/s.tif",
+        "flood_extent": "sar/f.tif", "permanent_water": "context/pw.tif",
+        "urban": "context/urb.tif", "susceptibility": "terrain/s.tif",
         "dem": "terrain/d.tif",
     }
     import app as appmod

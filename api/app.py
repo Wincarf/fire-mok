@@ -16,6 +16,8 @@ LAYERS = {
     "sar_before": "sar/S1A_IW_GRDH_1SDV_20240604T084924_20240604T084953_054171_069681_rtc_vv_db.tif",
     "sar_after": "sar/S1A_IW_GRDH_1SDV_20240511T084943_20240511T085008_053821_068A6E_rtc_vv_db.tif",
     "flood_extent": "sar/flood_extent_may2024.tif",
+    "permanent_water": "context/permanent_water_guaiba.tif",
+    "urban": "context/urban_guaiba.tif",
     "susceptibility": "terrain/susceptibility_guaiba.tif",
     "dem": "terrain/cop_dem_glo30_guaiba.tif",
 }
