@@ -7,6 +7,7 @@ import { Header } from "./components/Header";
 import { LayersDrawer } from "./components/LayersDrawer";
 import { MapHud } from "./components/MapHud";
 import { TriagePanel } from "./components/TriagePanel";
+import { Timeline } from "./components/Timeline";
 import { summarizeMunicipalities } from "./stats";
 import { sarSceneDate } from "./format";
 
@@ -398,6 +399,7 @@ export default function App() {
             onExportFlood={() => downloadJson("/api/flood_polygons", "areas_alagadas_may2024.geojson")}
           />
         )}
+        <Timeline step={step} onChapter={setStep} />
       </main>
 
       {step !== null && (
