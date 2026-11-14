@@ -45,9 +45,11 @@ const SAR_SCENE_BEFORE =
   "S1A_IW_GRDH_1SDV_20240604T084924_20240604T084953_054171_069681_rtc_vv_db.tif";
 
 const show = (on: boolean) => (on ? "visible" : "none");
+const GRAY = "rescale=-30,0";
 
-function styleFor(vis: Vis): maplibregl.StyleSpecification {
-  return {
+// mode "risk" = basemap + choropleth only; "before"/"after" add the SAR scene
+function styleFor(vis: Vis, mode: "risk" | "before" | "after"): maplibregl.StyleSpecification {
+  const s: maplibregl.StyleSpecification = {
     version: 8,
     sources: {
       osm: {
@@ -113,6 +115,16 @@ function styleFor(vis: Vis): maplibregl.StyleSpecification {
       } as any,
     ],
   };
+  if (mode !== "risk") {
+    (s.sources as any).sar = {
+      type: "raster",
+      tiles: [`/tiles/${mode === "before" ? "sar_before" : "sar_after"}/{z}/{x}/{y}.png?${GRAY}`],
+      tileSize: 256,
+    };
+    // sar sits above osm, below the vector overlays
+    s.layers.splice(1, 0, { id: "sar", type: "raster", source: "sar" } as any);
+  }
+  return s;
 }
 
 type Props = Record<string, any>;
@@ -120,13 +132,17 @@ type Props = Record<string, any>;
 export default function App() {
   const wrap = useRef<HTMLDivElement>(null);
   const mapRef = useRef<HTMLDivElement>(null);
+  const beforeRef = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
+  const beforeMap = useRef<maplibregl.Map | null>(null);
   const [selCode, setSelCode] = useState<string | null>(null);
   const [munis, setMunis] = useState<any[]>([]);
   const [plan, setPlan] = useState<any>(null);
   const [layers, setLayers] = useState<Vis>({ flood: false, sus: false, muni: true });
   const layersRef = useRef(layers);
   const selCodeRef = useRef(selCode);
+  const [compare, setCompare] = useState(false);
+  const [split, setSplit] = useState(50);
   const [step, setStep] = useState<number | null>(0);
   const [tiler, setTiler] = useState<"loading" | "online" | "offline">("loading");
   const [tilerMs, setTilerMs] = useState<number | null>(null);
@@ -143,6 +159,19 @@ export default function App() {
   const exitStory = () => {
     setStep(null);
     setLayers({ flood: false, sus: false, muni: true });
+  };
+
+  // shared municipality interactions for both maps
+  const attachCursors = (m: maplibregl.Map) => {
+    m.on("click", "muni-fill", (e) => {
+      const f = e.target.queryRenderedFeatures(e.point, { layers: ["muni-fill"] })[0];
+      setSelCode(f ? f.properties.code : null);
+    });
+    m.on("click", (e) => {
+      if (!m.queryRenderedFeatures(e.point, { layers: ["muni-fill"] }).length) setSelCode(null);
+    });
+    m.on("mouseenter", "muni-fill", () => (m.getCanvas().style.cursor = "pointer"));
+    m.on("mouseleave", "muni-fill", () => (m.getCanvas().style.cursor = ""));
   };
 
   const applyVis = (m: maplibregl.Map, l: Vis) => {
@@ -167,7 +196,7 @@ export default function App() {
       zoom: 9,
       attributionControl: false,
     });
-    m.on("load", () => m.setStyle(styleFor(layersRef.current)));
+    m.on("load", () => m.setStyle(styleFor(layersRef.current, "risk")));
     map.current = m;
 
     // re-apply toggles whenever a (re)loaded style finishes — the old effect
@@ -178,17 +207,7 @@ export default function App() {
         m.setFilter("muni-sel", ["==", ["get", "code"], selCodeRef.current ?? "__none__"] as any);
     });
 
-    m.on("load", () => {
-      m.on("click", "muni-fill", (e) => {
-        const f = e.target.queryRenderedFeatures(e.point, { layers: ["muni-fill"] })[0];
-        setSelCode(f ? f.properties.code : null);
-      });
-      m.on("click", (e) => {
-        if (!m.queryRenderedFeatures(e.point, { layers: ["muni-fill"] }).length) setSelCode(null);
-      });
-      m.on("mouseenter", "muni-fill", () => (m.getCanvas().style.cursor = "pointer"));
-      m.on("mouseleave", "muni-fill", () => (m.getCanvas().style.cursor = ""));
-    });
+    m.on("load", () => attachCursors(m));
 
     // live coordinate readout for the header HUD (rAF-throttled)
     let coordRaf = 0;
@@ -211,6 +230,54 @@ export default function App() {
       m.remove();
     };
   }, []);
+
+  // compare mode: second map (SAR recessão) under the clipped "pico" view
+  useEffect(() => {
+    const m = map.current;
+    if (!m) return;
+    m.setStyle(styleFor(layersRef.current, compare ? "after" : "risk"));
+    if (!compare || !beforeRef.current) return;
+    const m2 = new maplibregl.Map({
+      container: beforeRef.current,
+      style: { version: 8, sources: {}, layers: [] } as any,
+      center: m.getCenter(),
+      zoom: m.getZoom(),
+      attributionControl: false,
+    });
+    m2.on("load", () => {
+      m2.setStyle(styleFor(layersRef.current, "before"));
+      attachCursors(m2);
+    });
+    m2.on("styledata", () => {
+      applyVis(m2, layersRef.current);
+      if (m2.getLayer("muni-sel"))
+        m2.setFilter("muni-sel", ["==", ["get", "code"], selCodeRef.current ?? "__none__"] as any);
+    });
+    beforeMap.current = m2;
+
+    // keep both maps in sync (replaces maplibre-gl-compare, which needs node "events")
+    let syncing = false;
+    const on1 = () => {
+      if (syncing) return;
+      syncing = true;
+      m2.jumpTo({ center: m.getCenter(), zoom: m.getZoom(), bearing: m.getBearing(), pitch: m.getPitch() });
+      syncing = false;
+    };
+    const on2 = () => {
+      if (syncing) return;
+      syncing = true;
+      m.jumpTo({ center: m2.getCenter(), zoom: m2.getZoom(), bearing: m2.getBearing(), pitch: m2.getPitch() });
+      syncing = false;
+    };
+    m.on("move", on1);
+    m2.on("move", on2);
+    return () => {
+      m.off("move", on1);
+      m2.remove();
+      beforeMap.current = null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [compare]);
 
   // rio-tiler health probe for the header status pill
   useEffect(() => {
@@ -257,8 +324,8 @@ export default function App() {
   // layer toggles (styledata covers the not-yet-loaded case)
   useEffect(() => {
     layersRef.current = layers;
-    const m = map.current;
-    if (m && m.isStyleLoaded()) applyVis(m, layers);
+    for (const m of [map.current, beforeMap.current])
+      if (m && m.isStyleLoaded()) applyVis(m, layers);
   }, [layers]);
 
   // keep selCodeRef current so styledata can re-apply the highlight
@@ -266,11 +333,11 @@ export default function App() {
     selCodeRef.current = selCode;
   }, [selCode]);
 
-  // highlight the selected municipality outline
+  // highlight the selected municipality outline on every mounted map
   useEffect(() => {
-    const m = map.current;
-    if (m && m.getLayer("muni-sel"))
-      m.setFilter("muni-sel", ["==", ["get", "code"], sel?.code ?? "__none__"] as any);
+    for (const m of [map.current, beforeMap.current])
+      if (m && m.getLayer("muni-sel"))
+        m.setFilter("muni-sel", ["==", ["get", "code"], sel?.code ?? "__none__"] as any);
   }, [sel]);
 
   return (
@@ -295,8 +362,25 @@ export default function App() {
           zoom={zoom}
           onZoom={(d) => (d > 0 ? map.current?.zoomIn() : map.current?.zoomOut())}
           mapRef={mapRef}
+          beforeRef={beforeRef}
           containerRef={wrap}
           counts={counts}
+          compare={compare}
+          onCompare={() => setCompare((c) => !c)}
+          split={split}
+          onDividerDown={(e) => {
+            e.preventDefault();
+            const move = (ev: PointerEvent) => {
+              const r = wrap.current!.getBoundingClientRect();
+              setSplit(Math.min(100, Math.max(0, ((ev.clientX - r.left) / r.width) * 100)));
+            };
+            const up = () => {
+              window.removeEventListener("pointermove", move);
+              window.removeEventListener("pointerup", up);
+            };
+            window.addEventListener("pointermove", move);
+            window.addEventListener("pointerup", up);
+          }}
         />
         {sel && (
           <TriagePanel
