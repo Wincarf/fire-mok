@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import maplibregl from "maplibre-gl";
 import type { Vis } from "./vis";
+import { STORY, type Step } from "./story";
+import { StoryOverlay } from "./components/StoryOverlay";
 
 const CENTER: [number, number] = [-51.15, -30.05];
 const GRAY = "rescale=-30,0";
@@ -121,11 +123,16 @@ export default function App() {
   const afterMap = useRef<maplibregl.Map | null>(null);
   const maps = useRef<maplibregl.Map[]>([]);
   const [thresh, setThresh] = useState(-17);
-  const [sel, setSel] = useState<Props | null>(null);
+  const [selCode, setSelCode] = useState<string | null>(null);
+  const [munis, setMunis] = useState<any[]>([]);
   const [plan, setPlan] = useState<any>(null);
   const [layers, setLayers] = useState<Vis>({ flood: true, mask: false, sus: false, muni: true });
   const layersRef = useRef(layers);
   const [split, setSplit] = useState(50);
+  const [step, setStep] = useState<number | null>(0);
+
+  const sel: Props | null =
+    munis.find((f) => f.properties?.code === selCode)?.properties ?? null;
 
   const applyVis = (m: maplibregl.Map, l: Vis) => {
     // only set when different — styledata refires on setLayoutProperty and
@@ -176,20 +183,35 @@ export default function App() {
 
     const click = (e: maplibregl.MapMouseEvent) => {
       const f = e.target.queryRenderedFeatures(e.point, { layers: ["muni-fill"] })[0];
-      setSel(f ? f.properties : null);
+      setSelCode(f ? f.properties.code : null);
     };
     const cursor = (m: maplibregl.Map) => {
       m.on("click", "muni-fill", click);
       m.on("click", (e) => {
-        if (!m.queryRenderedFeatures(e.point, { layers: ["muni-fill"] }).length) setSel(null);
+        if (!m.queryRenderedFeatures(e.point, { layers: ["muni-fill"] }).length) setSelCode(null);
       });
       m.on("mouseenter", "muni-fill", () => (m.getCanvas().style.cursor = "pointer"));
       m.on("mouseleave", "muni-fill", () => (m.getCanvas().style.cursor = ""));
     };
     m1.on("load", () => cursor(m1));
     m2.on("load", () => cursor(m2));
+
+    fetch("/api/municipalities")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => d && setMunis(d.features ?? []));
     return () => { m1.remove(); m2.remove(); };
   }, []);
+
+  // guided story — each step drives camera, layers, divider, selection
+  useEffect(() => {
+    if (step === null) return;
+    const s: Step = STORY[step];
+    const m = afterMap.current;
+    if (m) m.flyTo({ center: [s.camera[0], s.camera[1]], zoom: s.camera[2] });
+    setLayers(s.layers);
+    setSplit(s.split);
+    setSelCode(s.sel ?? null);
+  }, [step]);
 
   useEffect(() => {
     if (!sel?.code) return setPlan(null);
@@ -255,13 +277,16 @@ export default function App() {
           <i style={{ background: RISK_COLOR.low }} />baixo
         </span>
         <span className="hint">Clique num município para ver exposição e plano de ação</span>
+        {step === null && (
+          <button className="story-btn" onClick={() => setStep(0)}>▶ Contar a história</button>
+        )}
       </div>
 
       <div ref={wrap} className="compare">
         <div ref={beforeRef} className="map" />
-        <div ref={afterRef} className="map top" style={{ clipPath: `inset(0 0 0 ${split}%)` }} />
+        <div ref={afterRef} className={`map top${step !== null ? " anim" : ""}`} style={{ clipPath: `inset(0 0 0 ${split}%)` }} />
         <div
-          className="divider"
+          className={`divider${step !== null ? " anim" : ""}`}
           style={{ left: `${split}%` }}
           onMouseDown={(e) => {
             e.preventDefault();
@@ -278,9 +303,21 @@ export default function App() {
         <span className="tag right">PICO · 11/mai (cheia)</span>
       </div>
 
+      {step !== null && (
+        <StoryOverlay
+          index={step}
+          total={STORY.length}
+          step={STORY[step]}
+          onPrev={() => setStep((s) => (s === null || s === 0 ? s : s - 1))}
+          onNext={() => setStep((s) => (s === null || s >= STORY.length - 1 ? null : s + 1))}
+          onSkip={() => setStep(null)}
+          onRestart={() => setStep(0)}
+        />
+      )}
+
       {sel && (
         <aside className="panel">
-          <button className="close" onClick={() => setSel(null)}>×</button>
+          <button className="close" onClick={() => setSelCode(null)}>×</button>
           <h2>{sel.name}</h2>
           <p className={`badge ${sel.risk_category}`}>
             Risco {sel.risk_category} · {Number(sel.risk).toFixed(2)}

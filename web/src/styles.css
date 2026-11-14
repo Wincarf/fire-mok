@@ -22,6 +22,8 @@ header span { font-size: 12px; opacity: 0.8; }
 .compare { position: relative; flex: 1; }
 .map { position: absolute; inset: 0; }
 .map.top { z-index: 2; }
+.map.top.anim { transition: clip-path 0.8s ease; }
+.divider.anim { transition: left 0.8s ease; }
 .divider {
   position: absolute; top: 0; bottom: 0; width: 4px; z-index: 6;
   background: #38bdf8; cursor: ew-resize; transform: translateX(-2px);
@@ -59,3 +61,23 @@ header span { font-size: 12px; opacity: 0.8; }
 .reasons { margin: 6px 0 0 16px; color: #64748b; }
 .actions { margin: 6px 0 0 20px; }
 .actions li { margin: 4px 0; }
+
+.story {
+  position: absolute; left: 50%; bottom: 26px; transform: translateX(-50%);
+  z-index: 20; width: min(480px, 90%); padding: 16px 20px;
+  background: #0f172aee; color: #e2e8f0; border-radius: 12px;
+  box-shadow: 0 10px 40px #0008; border: 1px solid #334155;
+}
+.story-count { font-size: 11px; letter-spacing: 1px; color: #7dd3fc; }
+.story h2 { font-size: 18px; margin: 4px 0 6px; }
+.story p { font-size: 14px; line-height: 1.45; margin: 0 0 12px; }
+.story-nav { display: flex; gap: 8px; justify-content: flex-end; }
+.story-nav button {
+  border: 0; border-radius: 8px; padding: 7px 14px; font-size: 13px; cursor: pointer;
+}
+.story-nav .primary { background: #38bdf8; color: #0f172a; font-weight: 600; }
+.story-nav .ghost { background: #334155; color: #e2e8f0; }
+.story-btn {
+  border: 1px solid #38bdf8; background: #38bdf822; color: #7dd3fc;
+  border-radius: 8px; padding: 4px 12px; font-size: 12px; cursor: pointer;
+}
