@@ -16,3 +16,6 @@ dist/
 # env / secrets
 .env
 .netrc
+
+# worktrees
+.worktrees/
