@@ -400,20 +400,18 @@ export default function App() {
           />
         )}
         <Timeline step={step} onChapter={setStep} />
+        {step !== null && (
+          <StoryOverlay
+            index={step}
+            total={STORY.length}
+            step={STORY[step]}
+            onPrev={() => setStep((s) => (s === null || s === 0 ? s : s - 1))}
+            onNext={() => setStep((s) => (s === null ? null : s >= STORY.length - 1 ? null : s + 1))}
+            onSkip={exitStory}
+            onRestart={() => setStep(0)}
+          />
+        )}
       </main>
-
-      {step !== null && (
-        <StoryOverlay
-          index={step}
-          total={STORY.length}
-          step={STORY[step]}
-          onPrev={() => setStep((s) => (s === null || s === 0 ? s : s - 1))}
-          onNext={() => setStep((s) => (s === null ? null : s >= STORY.length - 1 ? null : s + 1))}
-          onSkip={exitStory}
-          onRestart={() => setStep(0)}
-        />
-      )}
-
     </div>
   );
 }

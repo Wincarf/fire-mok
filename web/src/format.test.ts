@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { riskScore10, sarSceneDate, SAR_PLATFORM } from "./format";
+import { riskScore10, sarSceneDate, fmtInt, fmtPct, SAR_PLATFORM } from "./format";
 
 describe("riskScore10", () => {
   it("formats a 0..1 risk index as a 0..10 score with one decimal", () => {
@@ -42,5 +42,27 @@ describe("sarSceneDate", () => {
 describe("SAR_PLATFORM", () => {
   it("names the real platform", () => {
     expect(SAR_PLATFORM).toBe("Sentinel-1A · IW GRD");
+  });
+});
+
+describe("fmtInt", () => {
+  it("formats finite numbers pt-BR", () => {
+    expect(fmtInt(39512)).toBe((39512).toLocaleString("pt-BR"));
+    expect(fmtInt(0)).toBe("0");
+  });
+  it("returns an em dash for missing/non-finite input", () => {
+    expect(fmtInt(undefined)).toBe("—");
+    expect(fmtInt(NaN)).toBe("—");
+  });
+});
+
+describe("fmtPct", () => {
+  it("formats a 0..1 fraction as integer percent", () => {
+    expect(fmtPct(0.943)).toBe("94%");
+    expect(fmtPct(0)).toBe("0%");
+  });
+  it("returns an em dash for missing/non-finite input", () => {
+    expect(fmtPct(undefined)).toBe("—");
+    expect(fmtPct(Infinity)).toBe("—");
   });
 });

@@ -89,9 +89,9 @@ export function MapHud({
         </button>
       </div>
 
-      {/* Swipe divider */}
+      {/* Swipe divider — centered on the clip boundary (group is ~32px wide) */}
       <div
-        className={`absolute top-0 bottom-0 z-30 flex items-center justify-center cursor-ew-resize group${
+        className={`absolute top-0 bottom-0 z-30 flex items-center justify-center cursor-ew-resize group -translate-x-1/2${
           topAnim ? " divider-anim" : ""
         }`}
         style={{ left: `${split}%` }}

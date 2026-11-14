@@ -21,3 +21,13 @@ export function sarSceneDate(file: string): string {
   const month = MONTHS_PT[Number(mo) - 1];
   return month ? `${d}/${month}/${y}` : "—";
 }
+
+/** Integer with pt-BR thousands separators; missing/non-finite → em dash. */
+export function fmtInt(v: number | undefined | null): string {
+  return typeof v === "number" && Number.isFinite(v) ? v.toLocaleString("pt-BR") : "—";
+}
+
+/** 0..1 fraction → integer percent; missing/non-finite → em dash. */
+export function fmtPct(frac: number | undefined | null): string {
+  return typeof frac === "number" && Number.isFinite(frac) ? `${Math.round(frac * 100)}%` : "—";
+}

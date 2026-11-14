@@ -1,5 +1,5 @@
 import { RISK_LABEL, ptRisk } from "../labels";
-import { riskScore10 } from "../format";
+import { riskScore10, fmtInt, fmtPct } from "../format";
 
 type Plan = { priority: string; reasons: string[]; actions: string[] };
 
@@ -47,7 +47,7 @@ export function TriagePanel({ sel, plan, floodOk, onClose, onExportFlood }: Prop
   const cat = sel.risk_category as string;
   const exposurePct =
     Number.isFinite(sel.pop_exposed) && Number.isFinite(sel.population) && sel.population > 0
-      ? `${Math.round((100 * sel.pop_exposed) / sel.population)}% do município`
+      ? `${fmtPct(sel.pop_exposed / sel.population)} do município`
       : undefined;
 
   return (
@@ -84,12 +84,12 @@ export function TriagePanel({ sel, plan, floodOk, onClose, onExportFlood }: Prop
         <Kpi label="Score risco" value={riskScore10(sel.risk)} sub="/10" accent="text-tertiary-container" />
         <Kpi
           label="Pop. exposta"
-          value={Number(sel.pop_exposed).toLocaleString("pt-BR")}
+          value={fmtInt(sel.pop_exposed)}
           sub={exposurePct}
         />
         <Kpi
           label="Área submersa"
-          value={`${(100 * sel.flood_frac).toFixed(0)}%`}
+          value={fmtPct(sel.flood_frac)}
           sub="SAR Sentinel-1"
         />
       </div>
@@ -99,16 +99,17 @@ export function TriagePanel({ sel, plan, floodOk, onClose, onExportFlood }: Prop
           Dados municipais
         </div>
         <div className="rounded-lg bg-surface-container-low px-space-sm">
-          <Row label="População total" value={Number(sel.population).toLocaleString("pt-BR")} />
-          <Row label="Chuva máx. 7 dias" value={`${Number(sel.precip_max7d_mm).toFixed(0)} mm`} />
+          <Row label="População total" value={fmtInt(sel.population)} />
           <Row
-            label="Umidade do solo"
-            value={`${(100 * (sel.soil_moisture_mean ?? 0)).toFixed(0)}%`}
+            label="Chuva máx. 7 dias"
+            value={
+              Number.isFinite(sel.precip_max7d_mm)
+                ? `${Number(sel.precip_max7d_mm).toFixed(0)} mm`
+                : "—"
+            }
           />
-          <Row
-            label="Área naturalmente inundável"
-            value={`${(100 * (sel.sus_frac ?? 0)).toFixed(0)}%`}
-          />
+          <Row label="Umidade do solo" value={fmtPct(sel.soil_moisture_mean)} />
+          <Row label="Área naturalmente inundável" value={fmtPct(sel.sus_frac)} />
         </div>
       </div>
 
