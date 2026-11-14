@@ -65,9 +65,13 @@ def create_app(data_dir: Path | None = None) -> FastAPI:
             raise HTTPException(404, "tile outside dataset bounds")
         if str(img.array.dtype) == "bool":  # mask expressions render as 0/1
             img = ImageData(img.array.astype("uint8"), assets=img.assets, crs=img.crs, bounds=img.bounds)
-        ranges = [tuple(map(float, rescale.split(",")))] if rescale else None
-        cmap = json.loads(colormap) if colormap else None
-        png = img.render(img_format="PNG", rescale=ranges, colormap=cmap)
+        if rescale:  # stretch data to uint8 — render() has no rescale kwarg
+            img = img.rescale([tuple(map(float, rescale.split(",")))])
+        cmap = (
+            {float(k): tuple(v) for k, v in json.loads(colormap).items()}
+            if colormap else None
+        )  # json keys are strings; pixels match numeric keys only
+        png = img.render(img_format="PNG", colormap=cmap)
         return Response(content=png, media_type="image/png")
 
     @app.get("/api/municipalities")

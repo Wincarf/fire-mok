@@ -1,5 +1,7 @@
+import io
 import json
 import sys
+import urllib.parse
 from pathlib import Path
 
 import numpy as np
@@ -81,3 +83,56 @@ def test_tile_expression_mask(client):
     # interactive threshold: b1 < -10 -> constant 1
     r = client.get("/tiles/sar_before/8/91/150.png?expression=b1<-10")
     assert r.status_code == 200 and r.content[:8] == b"\x89PNG\r\n\x1a\n"
+
+
+def _write_cog(path: Path, arr: np.ndarray):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    nodata = np.nan if np.issubdtype(arr.dtype, np.floating) else None
+    with rasterio.open(
+        path, "w", driver="GTiff", height=256, width=256, count=1,
+        dtype=str(arr.dtype), crs="EPSG:4326",
+        transform=Affine(0.001, 0, -51.0, 0, -0.001, -30.0), nodata=nodata,
+    ) as ds:
+        ds.write(arr, 1)
+
+
+def _read_png(content: bytes) -> np.ndarray:
+    with rasterio.MemoryFile(content) as mem, mem.open() as ds:
+        return ds.read()
+
+
+def test_tile_rescale_produces_contrast(client, tmp_path):
+    # float32 dB raster: ?rescale=-30,0 must stretch values to distinct gray
+    # levels. Regression: rescale was passed to render() as **kwargs, silently
+    # dropped, and float32 fell back to dtype range -> uniform gray tile.
+    import app as appmod
+
+    appmod.LAYERS["sar_var"] = "sar/var.tif"
+    arr = np.full((256, 256), -25.0, dtype="float32")
+    arr[:, :128] = -5.0
+    _write_cog(tmp_path / "sar/var.tif", arr)
+
+    r = client.get("/tiles/sar_var/8/91/150.png?rescale=-30,0")
+    assert r.status_code == 200
+    gray = _read_png(r.content)[0]
+    # buggy fallback maps every dB value to ~127 (float32 dtype range), so
+    # max can't exceed ~128; correct rescale stretches -5 dB up to ~212
+    assert gray.max() > 150
+    assert len(np.unique(gray)) >= 2
+
+
+def test_tile_colormap_string_keys(client, tmp_path):
+    # colormap arrives as JSON -> json.loads yields string keys; the API must
+    # coerce them to numbers or no pixel matches and the tile is transparent.
+    import app as appmod
+
+    appmod.LAYERS["mask01"] = "sar/m.tif"
+    arr = np.zeros((256, 256), dtype="uint8")
+    arr[:, :128] = 1
+    _write_cog(tmp_path / "sar/m.tif", arr)
+
+    cmap = urllib.parse.quote(json.dumps({"0": [0, 0, 0, 0], "1": [220, 38, 38, 200]}))
+    r = client.get(f"/tiles/mask01/8/91/150.png?colormap={cmap}")
+    assert r.status_code == 200
+    bands = _read_png(r.content)
+    assert (bands[0] == 220).any()  # some pixel rendered red
