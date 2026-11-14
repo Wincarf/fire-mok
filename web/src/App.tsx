@@ -6,8 +6,8 @@ import { StoryOverlay } from "./components/StoryOverlay";
 import { Header } from "./components/Header";
 import { LayersDrawer } from "./components/LayersDrawer";
 import { MapHud } from "./components/MapHud";
+import { TriagePanel } from "./components/TriagePanel";
 import { summarizeMunicipalities } from "./stats";
-import { RISK_LABEL, ptRisk } from "./labels";
 import { sarSceneDate } from "./format";
 
 async function downloadJson(url: string, filename: string) {
@@ -162,6 +162,7 @@ export default function App() {
   const [tilerMs, setTilerMs] = useState<number | null>(null);
   const [coords, setCoords] = useState<{ lng: number; lat: number } | null>(null);
   const [zoom, setZoom] = useState(9);
+  const [floodOk, setFloodOk] = useState(false);
 
   const sel: Props | null =
     munis.find((f) => f.properties?.code === selCode)?.properties ?? null;
@@ -280,6 +281,13 @@ export default function App() {
       .catch(() => setTiler("offline"));
   }, []);
 
+  // flood-polygon export is only enabled when the layer was actually built
+  useEffect(() => {
+    fetch("/api/flood_polygons", { method: "HEAD" })
+      .then((r) => setFloodOk(r.ok))
+      .catch(() => setFloodOk(false));
+  }, []);
+
   // guided story — each step drives camera, layers, divider, selection
   useEffect(() => {
     if (step === null) return;
@@ -356,7 +364,7 @@ export default function App() {
         lastPass={sarSceneDate(SAR_SCENE_BEFORE)}
       />
 
-      <main className="pl-64 pt-16 h-full">
+      <main className="pl-64 pt-16 h-full relative">
         <MapHud
           zoom={zoom}
           onZoom={(d) => (d > 0 ? afterMap.current?.zoomIn() : afterMap.current?.zoomOut())}
@@ -381,6 +389,15 @@ export default function App() {
             window.addEventListener("pointerup", up);
           }}
         />
+        {sel && (
+          <TriagePanel
+            sel={sel}
+            plan={plan}
+            floodOk={floodOk}
+            onClose={() => setSelCode(null)}
+            onExportFlood={() => downloadJson("/api/flood_polygons", "areas_alagadas_may2024.geojson")}
+          />
+        )}
       </main>
 
       {step !== null && (
@@ -395,33 +412,6 @@ export default function App() {
         />
       )}
 
-      {sel && (
-        <aside className="panel">
-          <button className="close" onClick={() => setSelCode(null)}>×</button>
-          <h2>{sel.name}</h2>
-          <p className="big">
-            <strong>~{Number(sel.pop_exposed).toLocaleString("pt-BR")}</strong>
-            <span>pessoas potencialmente afetadas</span>
-          </p>
-          <p className={`badge ${sel.risk_category}`}>
-            Risco {RISK_LABEL[sel.risk_category] ?? sel.risk_category} · índice {Number(sel.risk).toFixed(2)}
-          </p>
-          <ul className="stats">
-            <li>População total: {Number(sel.population).toLocaleString("pt-BR")}</li>
-            <li>Área alagada: {(100 * sel.flood_frac).toFixed(1)}%</li>
-            <li>Chuva máx. 7 dias: {Number(sel.precip_max7d_mm).toFixed(0)} mm</li>
-            <li>Solo saturado: {(100 * (sel.soil_moisture_mean ?? 0)).toFixed(0)}%</li>
-            <li>Área naturalmente inundável: {(100 * (sel.sus_frac ?? 0)).toFixed(0)}%</li>
-          </ul>
-          {plan && (
-            <>
-              <h3>Plano de ação — prioridade {RISK_LABEL[plan.priority] ?? plan.priority}</h3>
-              <ul className="reasons">{plan.reasons.map((r: string, i: number) => <li key={i}>{ptRisk(r)}</li>)}</ul>
-              <ol className="actions">{plan.actions.map((a: string, i: number) => <li key={i}>{ptRisk(a)}</li>)}</ol>
-            </>
-          )}
-        </aside>
-      )}
     </div>
   );
 }
