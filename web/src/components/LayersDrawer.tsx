@@ -9,16 +9,16 @@ type Props = {
 };
 
 const LAYERS: { key: keyof Vis; name: string; chip: string; dot: string }[] = [
-  { key: "muni", name: "Municípios por risco", chip: "IBGE", dot: "bg-error" },
-  { key: "flood", name: "Água onde não devia estar", chip: "SAR", dot: "bg-primary" },
-  { key: "sus", name: "Áreas naturalmente inundáveis", chip: "DEM", dot: "bg-tertiary-container" },
+  { key: "muni", name: "Municipalities by risk", chip: "IBGE", dot: "bg-error" },
+  { key: "flood", name: "Water where it shouldn't be", chip: "SAR", dot: "bg-primary" },
+  { key: "sus", name: "Naturally flood-prone areas", chip: "DEM", dot: "bg-tertiary-container" },
 ];
 
 const RISK = [
-  { label: "crítico", cls: "bg-[#ef4444]" },
-  { label: "alto", cls: "bg-[#f97316]" },
-  { label: "moderado", cls: "bg-[#facc15]" },
-  { label: "baixo", cls: "bg-[#94a3b8]" },
+  { label: "critical", cls: "bg-[#ef4444]" },
+  { label: "high", cls: "bg-[#f97316]" },
+  { label: "moderate", cls: "bg-[#facc15]" },
+  { label: "low", cls: "bg-[#94a3b8]" },
 ];
 
 export function LayersDrawer({ layers, onToggle, summary, lastPass }: Props) {
@@ -27,7 +27,7 @@ export function LayersDrawer({ layers, onToggle, summary, lastPass }: Props) {
       <div className="p-space-md flex flex-col gap-space-md overflow-y-auto no-scrollbar">
         <div className="px-space-sm py-space-xs flex items-center justify-between text-on-surface-variant">
           <span className="font-label-mono-xs text-label-mono-xs tracking-wider uppercase">
-            Camadas &amp; Sensores
+            Layers &amp; Sensors
           </span>
           <span className="material-symbols-outlined text-[16px] text-outline">layers</span>
         </div>
@@ -57,7 +57,7 @@ export function LayersDrawer({ layers, onToggle, summary, lastPass }: Props) {
 
         <div className="px-space-sm">
           <span className="font-label-mono-xs text-label-mono-xs uppercase tracking-wider text-on-surface-variant">
-            Risco municipal
+            Municipal risk
           </span>
           <div className="mt-space-xs grid grid-cols-2 gap-space-xs">
             {RISK.map((r) => (
@@ -71,19 +71,19 @@ export function LayersDrawer({ layers, onToggle, summary, lastPass }: Props) {
 
         <div className="px-space-sm">
           <span className="font-label-mono-xs text-label-mono-xs uppercase tracking-wider text-on-surface-variant">
-            Resumo da AOI
+            AOI summary
           </span>
           <div className="mt-space-xs p-space-sm rounded-lg bg-surface-container-low">
             <div className="flex items-baseline justify-between">
               <span className="font-metric-lg text-metric-lg text-on-surface">
-                ~{summary.exposed.toLocaleString("pt-BR")}
+                ~{summary.exposed.toLocaleString("en-US")}
               </span>
               <span className="font-label-mono-xs text-label-mono-xs text-tertiary-container font-semibold uppercase">
-                {summary.critical} em risco crítico
+                {summary.critical} at critical risk
               </span>
             </div>
             <div className="font-label-mono-xs text-label-mono-xs text-outline mt-space-xs">
-              pessoas potencialmente afetadas
+              people potentially affected
             </div>
           </div>
         </div>
@@ -92,7 +92,7 @@ export function LayersDrawer({ layers, onToggle, summary, lastPass }: Props) {
       <div className="p-space-md bg-surface-container-low border-t border-outline-variant">
         <div className="flex items-center justify-between mb-space-xs">
           <span className="font-label-mono-xs text-label-mono-xs text-on-surface-variant uppercase tracking-wider">
-            Último Passe SAR
+            Last SAR pass
           </span>
           <span className="font-label-mono-xs text-label-mono-xs text-primary font-medium">
             {lastPass}

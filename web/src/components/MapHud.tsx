@@ -70,13 +70,13 @@ export function MapHud({
           <div className="px-space-md py-space-xs rounded bg-surface-container-lowest/90 backdrop-blur-md border border-outline-variant flex items-center gap-space-sm">
             <span className="w-2.5 h-2.5 rounded-full bg-primary" />
             <span className="font-label-mono-xs text-label-mono-xs text-on-surface font-semibold tracking-wider">
-              RECESSÃO · 04/JUN/24
+              RECESSION · 04/JUN/24
             </span>
           </div>
           <div className="px-space-md py-space-xs rounded bg-surface-container-lowest/90 backdrop-blur-md border border-outline-variant flex items-center gap-space-sm">
             <span className="w-2.5 h-2.5 rounded-full bg-error animate-pulse" />
             <span className="font-label-mono-xs text-label-mono-xs text-on-surface font-semibold tracking-wider">
-              PICO SAR · 11/MAI/24
+              SAR PEAK · 11/MAY/24
             </span>
           </div>
         </div>
@@ -86,7 +86,7 @@ export function MapHud({
       <div className="absolute top-space-md right-space-md z-20 hidden lg:flex items-center pointer-events-none">
         <div className="px-space-md py-space-xs rounded bg-surface-container-lowest/90 backdrop-blur-md border border-outline-variant flex items-center gap-space-md font-label-mono-xs text-label-mono-xs">
           <div>
-            <span className="text-outline">FONTE:</span>{" "}
+            <span className="text-outline">SOURCE:</span>{" "}
             <span className="text-on-surface font-medium">S1 SAR + DEM + IBGE</span>
           </div>
           <div>
@@ -101,7 +101,7 @@ export function MapHud({
         <button
           type="button"
           onClick={() => onZoom(1)}
-          title="Aproximar"
+          title="Zoom in"
           className="w-9 h-9 rounded bg-surface-container-low hover:bg-surface-container-high border border-outline-variant text-on-surface hover:text-primary shadow-md flex items-center justify-center transition-colors"
         >
           <span className="material-symbols-outlined text-[18px]">add</span>
@@ -109,7 +109,7 @@ export function MapHud({
         <button
           type="button"
           onClick={() => onZoom(-1)}
-          title="Afastar"
+          title="Zoom out"
           className="w-9 h-9 rounded bg-surface-container-low hover:bg-surface-container-high border border-outline-variant text-on-surface hover:text-primary shadow-md flex items-center justify-center transition-colors"
         >
           <span className="material-symbols-outlined text-[18px]">remove</span>
@@ -117,7 +117,7 @@ export function MapHud({
         <button
           type="button"
           onClick={onCompare}
-          title="Comparar SAR — recessão (04/jun) vs pico (11/mai)"
+          title="Compare SAR — recession (Jun 04) vs peak (May 11)"
           className={`w-9 h-9 rounded border shadow-md flex items-center justify-center transition-colors ${
             compare
               ? "bg-primary/20 border-primary text-primary"

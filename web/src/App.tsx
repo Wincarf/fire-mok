@@ -286,7 +286,7 @@ export default function App() {
     };
   }, []);
 
-  // compare mode: second map (SAR recessão) under the clipped "pico" view
+  // compare mode: second map (SAR recession) under the clipped "peak" view
   const comparePrev = useRef(false);
   useEffect(() => {
     const m = map.current;
@@ -401,7 +401,7 @@ export default function App() {
         tiler={tiler}
         tilerMs={tilerMs}
         coords={coords}
-        onExport={() => downloadJson("/api/municipalities", "municipios_risco_may2024.geojson")}
+        onExport={() => downloadJson("/api/municipalities", "municipal_risk_may2024.geojson")}
         onStory={() => setStep(0)}
       />
 
@@ -443,7 +443,7 @@ export default function App() {
             plan={plan}
             floodOk={floodOk}
             onClose={() => setSelCode(null)}
-            onExportFlood={() => downloadJson("/api/flood_polygons", "areas_alagadas_may2024.geojson")}
+            onExportFlood={() => downloadJson("/api/flood_polygons", "flooded_areas_may2024.geojson")}
           />
         )}
         <Timeline step={step} onChapter={setStep} />

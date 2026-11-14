@@ -38,7 +38,7 @@ jobs:
         with:
           python-version: "3.13"
       - run: uv sync --frozen
-      # api/tests roda no mesmo venv do pipeline (rasterio/rio-tiler/fastapi)
+      # api/tests run in the same venv as the pipeline (rasterio/rio-tiler/fastapi)
       - run: uv run pytest ../api/tests -q
 
   web:

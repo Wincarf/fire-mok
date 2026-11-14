@@ -7,7 +7,7 @@ type Props = {
 };
 
 const STATUS = {
-  loading: { dot: "bg-outline", text: "CONECTANDO…", textCls: "text-on-surface-variant" },
+  loading: { dot: "bg-outline", text: "CONNECTING…", textCls: "text-on-surface-variant" },
   online: { dot: "bg-primary animate-pulse", text: "ONLINE", textCls: "text-primary" },
   offline: { dot: "bg-error", text: "OFFLINE", textCls: "text-error" },
 } as const;
@@ -49,7 +49,7 @@ export function Header({ tiler, tilerMs, coords, onExport, onStory }: Props) {
             className="h-9 px-space-md rounded-lg border border-primary-container/60 text-primary hover:bg-primary-container/15 flex items-center gap-space-xs transition-colors"
           >
             <span className="material-symbols-outlined text-[18px]">play_arrow</span>
-            <span className="font-body-sm text-body-sm font-medium hidden sm:inline">História</span>
+            <span className="font-body-sm text-body-sm font-medium hidden sm:inline">Story</span>
           </button>
           <button
             type="button"
@@ -57,7 +57,7 @@ export function Header({ tiler, tilerMs, coords, onExport, onStory }: Props) {
             className="h-9 px-space-md rounded-lg bg-primary hover:bg-secondary-fixed text-on-primary flex items-center gap-space-xs transition-colors"
           >
             <span className="material-symbols-outlined text-[18px]">download</span>
-            <span className="font-body-sm text-body-sm font-medium hidden sm:inline">Exportar</span>
+            <span className="font-body-sm text-body-sm font-medium hidden sm:inline">Export</span>
           </button>
         </div>
       </div>

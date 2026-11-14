@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { STORY } from "./story";
 import { summarizeMunicipalities } from "./stats";
-import { RISK_LABEL, ptRisk } from "./labels";
+import { RISK_LABEL } from "./labels";
 
 const VIS_KEYS = ["flood", "sus", "muni"];
 
@@ -65,22 +65,10 @@ describe("summarizeMunicipalities", () => {
 });
 
 describe("risk labels", () => {
-  it("maps every API category to Portuguese", () => {
-    expect(RISK_LABEL.critical).toBe("crítico");
-    expect(RISK_LABEL.high).toBe("alto");
-    expect(RISK_LABEL.moderate).toBe("moderado");
-    expect(RISK_LABEL.low).toBe("baixo");
-  });
-
-  it("translates English category tokens inside API text", () => {
-    expect(ptRisk("categoria de risco critical")).toBe("categoria de risco crítico");
-    expect(ptRisk("categoria de risco moderate")).toBe("categoria de risco moderado");
-  });
-
-  it("leaves already-Portuguese text untouched", () => {
-    expect(ptRisk("solo próximo da saturação")).toBe("solo próximo da saturação");
-    expect(ptRisk("12.3% da área municipal com inundação observada")).toBe(
-      "12.3% da área municipal com inundação observada"
-    );
+  it("maps every API category to its English display label", () => {
+    expect(RISK_LABEL.critical).toBe("critical");
+    expect(RISK_LABEL.high).toBe("high");
+    expect(RISK_LABEL.moderate).toBe("moderate");
+    expect(RISK_LABEL.low).toBe("low");
   });
 });

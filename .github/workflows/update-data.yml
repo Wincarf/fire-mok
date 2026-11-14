@@ -2,9 +2,9 @@ name: monitoring update
 
 on:
   push:
-    paths: [".github/workflows/update-data.yml"] # valida o workflow ao mudá-lo
+    paths: [".github/workflows/update-data.yml"] # validate the workflow whenever it changes
   schedule:
-    - cron: "0 12 * * *" # daily 12:00 UTC = 09:00 em Brasília
+    - cron: "0 12 * * *" # daily 12:00 UTC = 09:00 Brasília time
   workflow_dispatch:
     inputs:
       lookback_days:

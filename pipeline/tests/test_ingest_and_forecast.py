@@ -77,10 +77,10 @@ def test_action_plan_forecast_rule():
     from pipeline.action_plan import build_action_plan
 
     plan = build_action_plan({"risk_category": "moderate", "precip_forecast_max7d_mm": 150.0})
-    assert any("previsão de 150 mm" in r for r in plan["reasons"])
-    assert any("alerta preventivo" in a for a in plan["actions"])
+    assert any("forecast of 150 mm" in r for r in plan["reasons"])
+    assert any("preventive alert" in a for a in plan["actions"])
     quiet = build_action_plan({"risk_category": "low", "precip_forecast_max7d_mm": 20.0})
-    assert not any("previsão" in r for r in quiet["reasons"])
+    assert not any("forecast" in r for r in quiet["reasons"])
 
 
 def test_forecast_parse_contract():

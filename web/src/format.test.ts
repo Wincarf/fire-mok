@@ -30,7 +30,7 @@ describe("sarSceneDate", () => {
       sarSceneDate(
         "S1A_IW_GRDH_1SDV_20240511T084943_20240511T085008_053821_068A6E_rtc_vv_db.tif"
       )
-    ).toBe("11/mai/2024");
+    ).toBe("11/may/2024");
   });
 
   it("returns an em dash when no timestamp is found", () => {
@@ -46,8 +46,8 @@ describe("SAR_PLATFORM", () => {
 });
 
 describe("fmtInt", () => {
-  it("formats finite numbers pt-BR", () => {
-    expect(fmtInt(39512)).toBe((39512).toLocaleString("pt-BR"));
+  it("formats finite numbers with thousands separators", () => {
+    expect(fmtInt(39512)).toBe((39512).toLocaleString("en-US"));
     expect(fmtInt(0)).toBe("0");
   });
   it("returns an em dash for missing/non-finite input", () => {

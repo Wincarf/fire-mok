@@ -10,17 +10,17 @@ export function Timeline({ step, onChapter }: Props) {
     <div className="absolute bottom-3 inset-x-3 z-30 rounded-xl bg-surface-container-lowest/85 backdrop-blur-xl border border-outline-variant px-space-md py-space-sm">
       <div className="flex items-center justify-between gap-space-md">
         <span className="font-label-mono-xs text-label-mono-xs text-on-surface-variant uppercase tracking-wider whitespace-nowrap">
-          Cronologia · Mai–Jun 2024
+          Timeline · May–Jun 2024
         </span>
         <div className="flex items-center gap-space-md font-label-mono-xs text-label-mono-xs">
           <span className="flex items-center gap-space-xs whitespace-nowrap">
             <span className="w-2 h-2 rounded-full bg-error" />
-            <span className="text-on-surface-variant">SAR PICO</span>
-            <span className="text-on-surface font-medium">11/MAI</span>
+            <span className="text-on-surface-variant">SAR PEAK</span>
+            <span className="text-on-surface font-medium">11/MAY</span>
           </span>
           <span className="flex items-center gap-space-xs whitespace-nowrap">
             <span className="w-2 h-2 rounded-full bg-primary" />
-            <span className="text-on-surface-variant">RECESSÃO</span>
+            <span className="text-on-surface-variant">RECESSION</span>
             <span className="text-on-surface font-medium">04/JUN</span>
           </span>
         </div>

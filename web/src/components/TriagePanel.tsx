@@ -1,4 +1,4 @@
-import { RISK_LABEL, ptRisk } from "../labels";
+import { RISK_LABEL } from "../labels";
 import { riskScore10, fmtInt, fmtPct } from "../format";
 
 type Plan = { priority: string; reasons: string[]; actions: string[] };
@@ -47,7 +47,7 @@ export function TriagePanel({ sel, plan, floodOk, onClose, onExportFlood }: Prop
   const cat = sel.risk_category as string;
   const exposurePct =
     Number.isFinite(sel.pop_exposed) && Number.isFinite(sel.population) && sel.population > 0
-      ? `${fmtPct(sel.pop_exposed / sel.population)} do município`
+      ? `${fmtPct(sel.pop_exposed / sel.population)} of the municipality`
       : undefined;
 
   return (
@@ -55,13 +55,13 @@ export function TriagePanel({ sel, plan, floodOk, onClose, onExportFlood }: Prop
       <div className="p-space-md border-b border-outline-variant">
         <div className="flex items-center justify-between gap-space-sm">
           <span className="font-label-mono-xs text-label-mono-xs text-tertiary-container tracking-wider uppercase font-semibold">
-            Triagem de emergência
+            Emergency triage
           </span>
           <button
             type="button"
             onClick={onClose}
             className="w-7 h-7 rounded bg-surface-container-low hover:bg-surface-container-high text-on-surface-variant hover:text-on-surface flex items-center justify-center transition-colors"
-            title="Fechar"
+            title="Close"
           >
             <span className="material-symbols-outlined text-[16px]">close</span>
           </button>
@@ -75,20 +75,20 @@ export function TriagePanel({ sel, plan, floodOk, onClose, onExportFlood }: Prop
               LEVEL_STYLE[cat] ?? "bg-surface-container text-on-surface-variant border-outline-variant"
             }`}
           >
-            Nível {RISK_LABEL[cat] ?? cat}
+            Level {RISK_LABEL[cat] ?? cat}
           </span>
         </div>
       </div>
 
       <div className="p-space-md grid grid-cols-3 gap-space-sm">
-        <Kpi label="Score risco" value={riskScore10(sel.risk)} sub="/10" accent="text-tertiary-container" />
+        <Kpi label="Risk score" value={riskScore10(sel.risk)} sub="/10" accent="text-tertiary-container" />
         <Kpi
-          label="Pop. exposta"
+          label="Exposed pop."
           value={fmtInt(sel.pop_exposed)}
           sub={exposurePct}
         />
         <Kpi
-          label="Área submersa"
+          label="Submerged area"
           value={fmtPct(sel.flood_frac)}
           sub="SAR Sentinel-1"
         />
@@ -96,20 +96,20 @@ export function TriagePanel({ sel, plan, floodOk, onClose, onExportFlood }: Prop
 
       <div className="px-space-md pb-space-md">
         <div className="font-label-mono-xs text-label-mono-xs text-on-surface-variant uppercase tracking-wider mb-space-xs">
-          Dados municipais
+          Municipal data
         </div>
         <div className="rounded-lg bg-surface-container-low px-space-sm">
-          <Row label="População total" value={fmtInt(sel.population)} />
+          <Row label="Total population" value={fmtInt(sel.population)} />
           <Row
-            label="Chuva máx. 7 dias"
+            label="Max 7-day rainfall"
             value={
               Number.isFinite(sel.precip_max7d_mm)
                 ? `${Number(sel.precip_max7d_mm).toFixed(0)} mm`
                 : "—"
             }
           />
-          <Row label="Umidade do solo" value={fmtPct(sel.soil_moisture_mean)} />
-          <Row label="Área naturalmente inundável" value={fmtPct(sel.sus_frac)} />
+          <Row label="Soil moisture" value={fmtPct(sel.soil_moisture_mean)} />
+          <Row label="Naturally flood-prone area" value={fmtPct(sel.sus_frac)} />
         </div>
       </div>
 
@@ -117,17 +117,17 @@ export function TriagePanel({ sel, plan, floodOk, onClose, onExportFlood }: Prop
         <div className="px-space-md pb-space-md">
           <div className="flex items-center justify-between mb-space-xs">
             <span className="font-label-mono-xs text-label-mono-xs text-on-surface-variant uppercase tracking-wider">
-              Fatores de risco
+              Risk factors
             </span>
             <span className="font-label-mono-xs text-label-mono-xs text-primary font-medium uppercase">
-              Prioridade {RISK_LABEL[plan.priority] ?? plan.priority}
+              Priority {RISK_LABEL[plan.priority] ?? plan.priority}
             </span>
           </div>
           <ul className="rounded-lg bg-surface-container-low p-space-sm space-y-space-xs">
             {plan.reasons.map((r, i) => (
               <li key={i} className="flex gap-space-xs font-body-sm text-body-sm text-on-surface-variant">
                 <span className="text-tertiary-container mt-0.5">▸</span>
-                {ptRisk(r)}
+                {r}
               </li>
             ))}
           </ul>
@@ -136,7 +136,7 @@ export function TriagePanel({ sel, plan, floodOk, onClose, onExportFlood }: Prop
             id="acoes"
             className="font-label-mono-xs text-label-mono-xs text-on-surface-variant uppercase tracking-wider mt-space-md mb-space-xs"
           >
-            Diretrizes de ação
+            Action guidelines
           </div>
           <ol className="space-y-space-xs">
             {plan.actions.map((a, i) => (
@@ -144,7 +144,7 @@ export function TriagePanel({ sel, plan, floodOk, onClose, onExportFlood }: Prop
                 <span className="w-5 h-5 rounded-full bg-primary-container/20 text-primary font-label-mono-xs text-label-mono-xs flex items-center justify-center shrink-0 mt-0.5">
                   {i + 1}
                 </span>
-                <span className="font-body-sm text-body-sm text-on-surface">{ptRisk(a)}</span>
+                <span className="font-body-sm text-body-sm text-on-surface">{a}</span>
               </li>
             ))}
           </ol>
@@ -158,18 +158,18 @@ export function TriagePanel({ sel, plan, floodOk, onClose, onExportFlood }: Prop
             className="h-9 rounded-lg bg-primary hover:bg-secondary-fixed text-on-primary flex items-center justify-center gap-space-xs font-body-sm text-body-sm font-medium transition-colors"
           >
             <span className="material-symbols-outlined text-[18px]">assignment</span>
-            Ver Plano de Ação
+            View Action Plan
           </a>
         )}
         <button
           type="button"
           onClick={onExportFlood}
           disabled={!floodOk}
-          title={floodOk ? "Baixar polígonos de inundação (GeoJSON)" : "Camada de polígonos não gerada"}
+          title={floodOk ? "Download flood polygons (GeoJSON)" : "Polygon layer not generated"}
           className="h-9 rounded-lg bg-surface-container hover:bg-surface-container-high disabled:opacity-40 disabled:cursor-not-allowed text-on-surface flex items-center justify-center gap-space-xs font-body-sm text-body-sm transition-colors"
         >
           <span className="material-symbols-outlined text-[18px]">download</span>
-          Exportar Polígonos GeoJSON
+          Export GeoJSON Polygons
         </button>
       </div>
     </aside>

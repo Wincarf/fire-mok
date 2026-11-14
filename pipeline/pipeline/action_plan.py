@@ -1,7 +1,7 @@
 """Deterministic per-municipality action plan (rules, no LLM).
 
 Actions are driven by the risk category plus which component fired.
-Portuguese strings — these reach the UI and the manager-facing report.
+Strings are English — they reach the UI and the manager-facing report.
 """
 
 SEVERITY_ORDER = ["low", "moderate", "high", "critical"]
@@ -24,51 +24,51 @@ def build_action_plan(m: dict) -> dict:
     pop_exposed = int(_num(m, "pop_exposed"))
 
     if cat in ("high", "critical"):
-        reasons.append(f"categoria de risco {cat}")
+        reasons.append(f"risk category {cat}")
         actions += [
-            f"Mobilizar abrigos para ~{pop_exposed:,}".replace(",", ".") + " pessoas potencialmente expostas",
-            "Pré-posicionar equipes de resgate e embarcações nas áreas de várzea",
-            "Emitir aviso preventivo à população das áreas ribeirinhas",
+            f"Mobilize shelters for ~{pop_exposed:,} potentially exposed people",
+            "Pre-position rescue teams and boats in the floodplain areas",
+            "Issue a preventive warning to riverside communities",
         ]
     elif cat == "moderate":
-        reasons.append("categoria de risco moderate")
+        reasons.append("risk category moderate")
         actions += [
-            "Inspecionar pontos de alagamento recorrente e bocas de lobo",
-            "Manter equipes de plantão para ocorrências pontuais",
+            "Inspect recurring flooding spots and storm drains",
+            "Keep on-call teams ready for isolated incidents",
         ]
     else:
         actions += [
-            "Manter rotina de limpeza de drenagem urbana",
-            "Atualizar cadastro de áreas de risco no plano diretor",
+            "Keep the routine urban drainage cleaning schedule",
+            "Update the hazard-area registry in the master plan",
         ]
 
     flood_frac = _num(m, "flood_frac")
     if flood_frac > 0.02:
-        reasons.append(f"{100*flood_frac:.1f}% da área municipal com inundação observada")
-        actions.append("Priorizar vistorias e desobstrução nos setores com água observada no SAR")
+        reasons.append(f"{100*flood_frac:.1f}% of the municipal area with observed flooding")
+        actions.append("Prioritize inspections and unclogging in sectors with water observed in the SAR")
     precip_max7d = _num(m, "precip_max7d_mm")
     if precip_max7d > 250:
-        reasons.append(f"{precip_max7d:.0f} mm em 7 dias")
-        actions.append("Monitorar níveis dos rios e reforçar aviso em caso de nova chuva intensa")
+        reasons.append(f"{precip_max7d:.0f} mm in 7 days")
+        actions.append("Monitor river levels and reinforce the warning if intense rain returns")
     precip_fc = _num(m, "precip_forecast_max7d_mm")
     if precip_fc > 100:
-        reasons.append(f"previsão de {precip_fc:.0f} mm nos próximos 7 dias")
-        actions.append("Preparar alerta preventivo para a próxima semana — chuva prevista sobre solo já carregado")
+        reasons.append(f"forecast of {precip_fc:.0f} mm over the next 7 days")
+        actions.append("Prepare a preventive alert for next week — forecast rain over already saturated soil")
     soil = _num(m, "soil_moisture_mean")
     if soil > 0.4:
-        reasons.append("solo próximo da saturação")
-        actions.append("Atenção a encostas e áreas de infiltração — solo saturado reduz escoamento")
+        reasons.append("soil near saturation")
+        actions.append("Watch slopes and infiltration areas — saturated soil reduces absorption")
     sus_frac = _num(m, "sus_frac")
     if sus_frac > 0.5:
-        reasons.append(f"{100*sus_frac:.0f}% do território em terreno baixo e plano")
-        actions.append("Revisar rotas de fuga e pontos de encontro em áreas de várzea")
+        reasons.append(f"{100*sus_frac:.0f}% of the territory on low, flat terrain")
+        actions.append("Review evacuation routes and meeting points in floodplain areas")
     if pop_exposed > 10_000:
-        reasons.append(f"~{pop_exposed:,} pessoas na área potencialmente afetada".replace(",", "."))
-        actions.append("Acionar plano de contingência intermunicipal/regional")
+        reasons.append(f"~{pop_exposed:,} people in the potentially affected area")
+        actions.append("Trigger the intermunicipal/regional contingency plan")
 
     return {
         "municipality": m.get("name", ""),
         "priority": cat,
-        "reasons": reasons or ["indicadores dentro da faixa normal"],
+        "reasons": reasons or ["indicators within the normal range"],
         "actions": actions,
     }

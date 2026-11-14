@@ -50,8 +50,8 @@ def render_layer(name: str, rel: str, special: str | None, out_dir: Path, data: 
         b = transform_bounds(cog.crs, "EPSG:4326", *cog.bounds, densify_pts=21)
         lo = (max(b[0], AOI_BBOX[0]), max(b[1], AOI_BBOX[1]), min(b[2], AOI_BBOX[2]), min(b[3], AOI_BBOX[3]))
         for z in Z_RANGE:
-            # xy() converte lon/lat (4326) direto para índices de tile — sem
-            # passagem por 3857 (metros), que esvaziaria os ranges
+            # xy() converts lon/lat (4326) straight to tile indices — no
+            # detour through 3857 (meters), which would empty the ranges
             def xy(lon, lat, z):
                 x = (lon + 180.0) / 360.0 * 2**z
                 lr = math.radians(lat)
@@ -107,7 +107,7 @@ def main() -> int:
         src = ng / f
         if src.exists():
             shutil.copyfile(src, assets / f)
-            print(f"  assets/{f}: copiado")
+            print(f"  assets/{f}: copied")
 
     # 2) static vector endpoints (extensionless, same paths the app fetches)
     api = out / "site" / "api"

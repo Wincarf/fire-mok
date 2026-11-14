@@ -20,7 +20,7 @@ export function StoryOverlay({ index, total, step, onPrev, onNext, onSkip, onRes
   return (
     <div className="absolute bottom-24 left-1/2 -translate-x-1/2 z-30 w-[min(480px,90%)] rounded-xl bg-surface-container-lowest/85 backdrop-blur-xl border border-outline-variant shadow-2xl p-space-lg">
       <span className="font-label-mono-xs text-label-mono-xs text-primary tracking-widest uppercase">
-        Passo {index + 1}/{total}
+        Step {index + 1}/{total}
       </span>
       <h2 className="font-headline-sm text-headline-sm text-on-surface font-semibold mt-space-xs">
         {step.title}
@@ -31,21 +31,21 @@ export function StoryOverlay({ index, total, step, onPrev, onNext, onSkip, onRes
       <div className="flex gap-space-sm justify-end mt-space-md">
         {!last && (
           <button type="button" className={ghost} onClick={onSkip}>
-            pular
+            skip
           </button>
         )}
         {index > 0 && (
           <button type="button" className={ghost} onClick={onPrev}>
-            ◂ voltar
+            ◂ back
           </button>
         )}
         {last && (
           <button type="button" className={ghost} onClick={onRestart}>
-            recomeçar
+            restart
           </button>
         )}
         <button type="button" className={primary} onClick={onNext}>
-          {last ? "explorar ▸" : "avançar ▸"}
+          {last ? "explore ▸" : "next ▸"}
         </button>
       </div>
     </div>
