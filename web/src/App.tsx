@@ -3,8 +3,24 @@ import maplibregl from "maplibre-gl";
 import type { Vis } from "./vis";
 import { STORY, type Step } from "./story";
 import { StoryOverlay } from "./components/StoryOverlay";
+import { Header } from "./components/Header";
 import { summarizeMunicipalities } from "./stats";
 import { RISK_LABEL, ptRisk } from "./labels";
+
+async function downloadJson(url: string, filename: string) {
+  try {
+    const r = await fetch(url);
+    if (!r.ok) return;
+    const blob = await r.blob();
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  } catch {
+    /* offline / api down — nothing to export */
+  }
+}
 
 const CENTER: [number, number] = [-51.15, -30.05];
 const GRAY = "rescale=-30,0";
@@ -135,6 +151,9 @@ export default function App() {
   const [split, setSplit] = useState(50);
   const [step, setStep] = useState<number | null>(0);
   const [dragging, setDragging] = useState(false);
+  const [tiler, setTiler] = useState<"loading" | "online" | "offline">("loading");
+  const [tilerMs, setTilerMs] = useState<number | null>(null);
+  const [coords, setCoords] = useState<{ lng: number; lat: number } | null>(null);
 
   const sel: Props | null =
     munis.find((f) => f.properties?.code === selCode)?.properties ?? null;
@@ -216,11 +235,40 @@ export default function App() {
     m1.on("load", () => cursor(m1));
     m2.on("load", () => cursor(m2));
 
+    // live coordinate readout for the header HUD (rAF-throttled)
+    let coordRaf = 0;
+    const onHover = (e: maplibregl.MapMouseEvent) => {
+      if (coordRaf) return;
+      const { lng, lat } = e.lngLat;
+      coordRaf = requestAnimationFrame(() => {
+        coordRaf = 0;
+        setCoords({ lng, lat });
+      });
+    };
+    m1.on("mousemove", onHover);
+    m2.on("mousemove", onHover);
+
     fetch("/api/municipalities")
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => d && setMunis(d.features ?? []))
       .catch(() => {});
-    return () => { m1.remove(); m2.remove(); };
+    return () => {
+      cancelAnimationFrame(coordRaf);
+      m1.remove();
+      m2.remove();
+    };
+  }, []);
+
+  // rio-tiler health probe for the header status pill
+  useEffect(() => {
+    const t0 = performance.now();
+    fetch("/api/layers")
+      .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
+      .then(() => {
+        setTiler("online");
+        setTilerMs(Math.round(performance.now() - t0));
+      })
+      .catch(() => setTiler("offline"));
   }, []);
 
   // guided story — each step drives camera, layers, divider, selection
@@ -278,77 +326,84 @@ export default function App() {
   }, [sel]);
 
   return (
-    <div className="app">
-      <header>
-        <h1>Fire Mok</h1>
-        <span>A enchente de maio de 2024 no Guaíba vista por radar de satélite — arraste a linha e clique nos municípios</span>
-      </header>
+    <div className="h-full bg-surface text-on-surface">
+      <Header
+        tiler={tiler}
+        tilerMs={tilerMs}
+        coords={coords}
+        onExport={() => downloadJson("/api/municipalities", "municipios_risco_may2024.geojson")}
+        onStory={() => setStep(0)}
+      />
 
-      <div className="toolbar">
-        <label>
-          <input type="checkbox" checked={layers.flood} onChange={(e) => setLayers({ ...layers, flood: e.target.checked })} />
-          Água onde não devia estar
-        </label>
-        <label>
-          <input type="checkbox" checked={layers.mask} onChange={(e) => setLayers({ ...layers, mask: e.target.checked })} />
-          Simulador de detecção
-        </label>
-        <label>
-          <input type="checkbox" checked={layers.sus} onChange={(e) => setLayers({ ...layers, sus: e.target.checked })} />
-          Áreas naturalmente inundáveis
-        </label>
-        <label>
-          <input type="checkbox" checked={layers.muni} onChange={(e) => setLayers({ ...layers, muni: e.target.checked })} />
-          Municípios por risco
-        </label>
-        <label className="slider" title="Limiar de retroespalhamento radar (σ0) usado para classificar água">
-          Limiar de detecção: {thresh} dB
-          <input type="range" min={-25} max={-10} step={0.5} value={thresh}
-            onChange={(e) => { setThresh(Number(e.target.value)); setLayers((l) => ({ ...l, mask: true })); }} />
-        </label>
-        <span className="legend">
-          Risco: <i style={{ background: RISK_COLOR.critical }} />crítico
-          <i style={{ background: RISK_COLOR.high }} />alto
-          <i style={{ background: RISK_COLOR.moderate }} />moderado
-          <i style={{ background: RISK_COLOR.low }} />baixo
-        </span>
-        <span className="hint">Clique num município para ver exposição e plano de ação</span>
-        {step === null && (
-          <button className="story-btn" onClick={() => setStep(0)}>▶ Contar a história</button>
-        )}
-      </div>
+      {/* Temporary layer controls — replaced by LayersDrawer in the next task */}
+      <aside className="fixed left-0 top-16 bottom-0 w-64 z-40 bg-surface-container-lowest border-r border-outline-variant overflow-y-auto no-scrollbar">
+        <div className="p-space-md flex flex-col gap-space-sm">
+          <span className="font-label-mono-xs text-label-mono-xs tracking-wider uppercase text-on-surface-variant">
+            Camadas &amp; Sensores
+          </span>
+          <label className="flex items-center gap-space-sm font-body-sm text-body-sm">
+            <input type="checkbox" checked={layers.flood} onChange={(e) => setLayers({ ...layers, flood: e.target.checked })} />
+            Água onde não devia estar
+          </label>
+          <label className="flex items-center gap-space-sm font-body-sm text-body-sm">
+            <input type="checkbox" checked={layers.mask} onChange={(e) => setLayers({ ...layers, mask: e.target.checked })} />
+            Simulador de detecção
+          </label>
+          <label className="flex items-center gap-space-sm font-body-sm text-body-sm">
+            <input type="checkbox" checked={layers.sus} onChange={(e) => setLayers({ ...layers, sus: e.target.checked })} />
+            Áreas naturalmente inundáveis
+          </label>
+          <label className="flex items-center gap-space-sm font-body-sm text-body-sm">
+            <input type="checkbox" checked={layers.muni} onChange={(e) => setLayers({ ...layers, muni: e.target.checked })} />
+            Municípios por risco
+          </label>
+          <label className="font-body-sm text-body-sm" title="Limiar de retroespalhamento radar (σ0) usado para classificar água">
+            Limiar de detecção: <span className="font-label-mono-sm text-label-mono-sm text-primary">{thresh} dB</span>
+            <input type="range" min={-25} max={-10} step={0.5} value={thresh} className="w-full"
+              onChange={(e) => { setThresh(Number(e.target.value)); setLayers((l) => ({ ...l, mask: true })); }} />
+          </label>
+          <span className="flex flex-wrap gap-x-2 gap-y-1 items-center font-label-mono-xs text-label-mono-xs text-on-surface-variant">
+            Risco: <i className="inline-block w-2.5 h-2.5 rounded-sm" style={{ background: RISK_COLOR.critical }} />crítico
+            <i className="inline-block w-2.5 h-2.5 rounded-sm ml-1" style={{ background: RISK_COLOR.high }} />alto
+            <i className="inline-block w-2.5 h-2.5 rounded-sm ml-1" style={{ background: RISK_COLOR.moderate }} />moderado
+            <i className="inline-block w-2.5 h-2.5 rounded-sm ml-1" style={{ background: RISK_COLOR.low }} />baixo
+          </span>
+        </div>
+      </aside>
 
-      <div ref={wrap} className="compare">
-        <div ref={beforeRef} className="map" />
-        <div ref={afterRef} className={`map top${step !== null && !dragging ? " anim" : ""}`} style={{ clipPath: `inset(0 0 0 ${split}%)` }} />
-        <div
-          className={`divider${step !== null && !dragging ? " anim" : ""}`}
-          style={{ left: `${split}%` }}
-          onPointerDown={(e) => {
-            e.preventDefault();
-            setDragging(true);
-            const move = (ev: PointerEvent) => {
-              const r = wrap.current!.getBoundingClientRect();
-              setSplit(Math.min(100, Math.max(0, ((ev.clientX - r.left) / r.width) * 100)));
-            };
-            const up = () => {
-              setDragging(false);
-              window.removeEventListener("pointermove", move);
-              window.removeEventListener("pointerup", up);
-            };
-            window.addEventListener("pointermove", move);
-            window.addEventListener("pointerup", up);
-          }}
-        />
-        <span className="tag left">ÁGUA NORMAL · jun/2024</span>
-        <span className="tag right">PICO DA CHEIA · 11/mai/2024</span>
-        {munis.length > 0 && step === null && (
-          <div className="banner">
-            <strong>~{summary.exposed.toLocaleString("pt-BR")}</strong> pessoas potencialmente
-            afetadas · <strong>{summary.critical}</strong> municípios em risco crítico
-          </div>
-        )}
-      </div>
+      <main className="pl-64 pt-16 h-full">
+        <div ref={wrap} className="compare relative h-full">
+          <div ref={beforeRef} className="map" />
+          <div ref={afterRef} className={`map top${step !== null && !dragging ? " anim" : ""}`} style={{ clipPath: `inset(0 0 0 ${split}%)` }} />
+          <div
+            className={`divider${step !== null && !dragging ? " anim" : ""}`}
+            style={{ left: `${split}%` }}
+            onPointerDown={(e) => {
+              e.preventDefault();
+              setDragging(true);
+              const move = (ev: PointerEvent) => {
+                const r = wrap.current!.getBoundingClientRect();
+                setSplit(Math.min(100, Math.max(0, ((ev.clientX - r.left) / r.width) * 100)));
+              };
+              const up = () => {
+                setDragging(false);
+                window.removeEventListener("pointermove", move);
+                window.removeEventListener("pointerup", up);
+              };
+              window.addEventListener("pointermove", move);
+              window.addEventListener("pointerup", up);
+            }}
+          />
+          <span className="tag left">ÁGUA NORMAL · jun/2024</span>
+          <span className="tag right">PICO DA CHEIA · 11/mai/2024</span>
+          {munis.length > 0 && step === null && (
+            <div className="banner">
+              <strong>~{summary.exposed.toLocaleString("pt-BR")}</strong> pessoas potencialmente
+              afetadas · <strong>{summary.critical}</strong> municípios em risco crítico
+            </div>
+          )}
+        </div>
+      </main>
 
       {step !== null && (
         <StoryOverlay
