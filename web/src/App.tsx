@@ -1,7 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import maplibregl from "maplibre-gl";
-import Compare from "@maplibre/maplibre-gl-compare";
-import "@maplibre/maplibre-gl-compare/dist/maplibre-gl-compare.css";
 
 const CENTER: [number, number] = [-51.15, -30.05];
 const GRAY = "rescale=-30,0";
@@ -111,6 +109,7 @@ export default function App() {
   const [sel, setSel] = useState<Props | null>(null);
   const [plan, setPlan] = useState<any>(null);
   const [layers, setLayers] = useState({ flood: true, mask: false, sus: false, muni: true });
+  const [split, setSplit] = useState(50);
 
   useEffect(() => {
     const opts = {
@@ -125,7 +124,19 @@ export default function App() {
     m2.on("load", () => m2.setStyle(styleFor("after", thresh)));
     afterMap.current = m2;
     maps.current = [m1, m2];
-    new Compare(m1, m2, wrap.current!, {});
+
+    // keep both maps in sync (replaces maplibre-gl-compare, which needs node "events")
+    let syncing = false;
+    const sync = (src: maplibregl.Map, dst: maplibregl.Map) => {
+      src.on("move", () => {
+        if (syncing) return;
+        syncing = true;
+        dst.jumpTo({ center: src.getCenter(), zoom: src.getZoom(), bearing: src.getBearing(), pitch: src.getPitch() });
+        syncing = false;
+      });
+    };
+    sync(m1, m2);
+    sync(m2, m1);
 
     const click = (e: maplibregl.MapMouseEvent) => {
       const f = e.target.queryRenderedFeatures(e.point, { layers: ["muni-fill"] })[0];
@@ -202,7 +213,21 @@ export default function App() {
 
       <div ref={wrap} className="compare">
         <div ref={beforeRef} className="map" />
-        <div ref={afterRef} className="map" />
+        <div ref={afterRef} className="map top" style={{ clipPath: `inset(0 0 0 ${split}%)` }} />
+        <div
+          className="divider"
+          style={{ left: `${split}%` }}
+          onMouseDown={(e) => {
+            e.preventDefault();
+            const move = (ev: MouseEvent) => {
+              const r = wrap.current!.getBoundingClientRect();
+              setSplit(Math.min(100, Math.max(0, ((ev.clientX - r.left) / r.width) * 100)));
+            };
+            const up = () => { window.removeEventListener("mousemove", move); window.removeEventListener("mouseup", up); };
+            window.addEventListener("mousemove", move);
+            window.addEventListener("mouseup", up);
+          }}
+        />
         <span className="tag left">BASE SECA · 04/jun (recessão)</span>
         <span className="tag right">PICO · 11/mai (cheia)</span>
       </div>

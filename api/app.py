@@ -3,7 +3,6 @@
 import json
 from pathlib import Path
 
-import numpy as np
 import rasterio
 from fastapi import FastAPI, HTTPException, Query, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -57,8 +56,13 @@ def create_app(data_dir: Path | None = None) -> FastAPI:
         colormap: str | None = Query(None),
     ):
         path = layer_path(layer)
-        with COGReader(str(path)) as cog:
-            img = cog.tile(x, y, z, expression=expression)
+        from rio_tiler.errors import TileOutsideBounds
+
+        try:
+            with COGReader(str(path)) as cog:
+                img = cog.tile(x, y, z, expression=expression)
+        except TileOutsideBounds:
+            raise HTTPException(404, "tile outside dataset bounds")
         if str(img.array.dtype) == "bool":  # mask expressions render as 0/1
             img = ImageData(img.array.astype("uint8"), assets=img.assets, crs=img.crs, bounds=img.bounds)
         ranges = [tuple(map(float, rescale.split(",")))] if rescale else None
