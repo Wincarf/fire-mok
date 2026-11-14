@@ -5,6 +5,7 @@ import { STORY, type Step } from "./story";
 import { StoryOverlay } from "./components/StoryOverlay";
 import { Header } from "./components/Header";
 import { LayersDrawer } from "./components/LayersDrawer";
+import { MapHud } from "./components/MapHud";
 import { summarizeMunicipalities } from "./stats";
 import { RISK_LABEL, ptRisk } from "./labels";
 import { sarSceneDate } from "./format";
@@ -160,6 +161,7 @@ export default function App() {
   const [tiler, setTiler] = useState<"loading" | "online" | "offline">("loading");
   const [tilerMs, setTilerMs] = useState<number | null>(null);
   const [coords, setCoords] = useState<{ lng: number; lat: number } | null>(null);
+  const [zoom, setZoom] = useState(9);
 
   const sel: Props | null =
     munis.find((f) => f.properties?.code === selCode)?.properties ?? null;
@@ -253,6 +255,7 @@ export default function App() {
     };
     m1.on("mousemove", onHover);
     m2.on("mousemove", onHover);
+    m2.on("zoom", () => setZoom(m2.getZoom()));
 
     fetch("/api/municipalities")
       .then((r) => (r.ok ? r.json() : null))
@@ -354,37 +357,30 @@ export default function App() {
       />
 
       <main className="pl-64 pt-16 h-full">
-        <div ref={wrap} className="compare relative h-full">
-          <div ref={beforeRef} className="map" />
-          <div ref={afterRef} className={`map top${step !== null && !dragging ? " anim" : ""}`} style={{ clipPath: `inset(0 0 0 ${split}%)` }} />
-          <div
-            className={`divider${step !== null && !dragging ? " anim" : ""}`}
-            style={{ left: `${split}%` }}
-            onPointerDown={(e) => {
-              e.preventDefault();
-              setDragging(true);
-              const move = (ev: PointerEvent) => {
-                const r = wrap.current!.getBoundingClientRect();
-                setSplit(Math.min(100, Math.max(0, ((ev.clientX - r.left) / r.width) * 100)));
-              };
-              const up = () => {
-                setDragging(false);
-                window.removeEventListener("pointermove", move);
-                window.removeEventListener("pointerup", up);
-              };
-              window.addEventListener("pointermove", move);
-              window.addEventListener("pointerup", up);
-            }}
-          />
-          <span className="tag left">ÁGUA NORMAL · jun/2024</span>
-          <span className="tag right">PICO DA CHEIA · 11/mai/2024</span>
-          {munis.length > 0 && step === null && (
-            <div className="banner">
-              <strong>~{summary.exposed.toLocaleString("pt-BR")}</strong> pessoas potencialmente
-              afetadas · <strong>{summary.critical}</strong> municípios em risco crítico
-            </div>
-          )}
-        </div>
+        <MapHud
+          zoom={zoom}
+          onZoom={(d) => (d > 0 ? afterMap.current?.zoomIn() : afterMap.current?.zoomOut())}
+          split={split}
+          topAnim={step !== null && !dragging}
+          beforeRef={beforeRef}
+          afterRef={afterRef}
+          containerRef={wrap}
+          onDividerDown={(e) => {
+            e.preventDefault();
+            setDragging(true);
+            const move = (ev: PointerEvent) => {
+              const r = wrap.current!.getBoundingClientRect();
+              setSplit(Math.min(100, Math.max(0, ((ev.clientX - r.left) / r.width) * 100)));
+            };
+            const up = () => {
+              setDragging(false);
+              window.removeEventListener("pointermove", move);
+              window.removeEventListener("pointerup", up);
+            };
+            window.addEventListener("pointermove", move);
+            window.addEventListener("pointerup", up);
+          }}
+        />
       </main>
 
       {step !== null && (
