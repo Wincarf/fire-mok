@@ -1,11 +1,11 @@
-# Fire Mok — Design (NASA Space Apps 2026 · "Dancing with the SARs")
+# Fire Mok — Design
 
 ## Intenção e porquê
 
 Construir o **Fire Mok**: plataforma inteligente de monitoramento de enchentes com
 foco no Rio Grande do Sul.
 
-O desafio pede um app interativo que use dados de radar (NISAR) para rastrear e
+O objetivo é um app interativo que use dados de radar (NISAR) para rastrear e
 visualizar mudança de superfície. Nossa mudança de superfície é **água onde não
 deveria ter água**: enchentes. SAR é o sensor certo — opera à noite e através de
 nuvem, exatamente quando enchentes acontecem e sensores ópticos falham.
@@ -34,11 +34,11 @@ evento, com plano de ação por município.
 - Painel IBGE: município clicável → população exposta + plano de ação.
 - App React + MapLibre com swipe antes/depois, time slider, toggles de camada.
 - API FastAPI servindo tiles dos COGs + endpoints de risco/plano.
-- Vídeo demo + submissão do desafio.
+- Vídeo demo.
 
 ## Non-goals
 
-- Dados dos outros 13 desafios (descoped pelo usuário).
+- Datasets fora do escopo de enchente (descoped pelo usuário).
 - Deploy em nuvem / usuários / autenticação — demo local + vídeo.
 - Modelo hidrológico operacional (HEC-RAS etc.).
 
@@ -54,7 +54,7 @@ evento, com plano de ação por município.
 
 ## Constraints
 
-- ~1,5 dia de hackathon; a máquina é Windows (Python 3.14/3.13/3.11, Node 24, uv).
+- ~1,5 dia de sprint; a máquina é Windows (Python 3.14/3.13/3.11, Node 24, uv).
 - Python **3.13** via `uv` para o pipeline (rasterio/GDAL têm wheels; 3.14 é
   novo demais).
 - Earthdata Login: usuário vai criar; até lá, tudo funciona com fontes sem auth.
@@ -67,11 +67,11 @@ evento, com plano de ação por município.
 
 ### Dados SAR
 
-- **A — NISAR only (asf_search + Earthdata):** mais on-brand pro desafio, mas
+- **A — NISAR only (asf_search + Earthdata):** mais alinhado à missão NISAR, mas
   cobertura temporal curta (VALIDATED ~3 semanas) e trava sem login.
 - **B — Sentinel-1 RTC via MS Planetary Computer (STAC, sem auth):** arquivo
   desde 2014, captura a enchente de mai/2024 inteira; funciona hoje. Mas é
-  C-band, não é NISAR — sozinho, fraco pro desafio.
+  C-band, não é NISAR — sozinho, cobertura temporal curta demais.
 - **C — Híbrido (escolhida):** Sentinel-1 RTC como baseline histórico e
   narrativa (mai/2024), NISAR GCOV como "o presente" da plataforma.
   Se o login atrasar, o demo não trava; quando entrar, ganhamos o diferencial
