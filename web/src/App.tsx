@@ -97,11 +97,14 @@ function styleFor(vis: Vis, mode: "risk" | "before" | "after"): maplibregl.Style
             "low", RISK_COLOR.low,
             "#888888",
           ] as any,
-          // low risk reads as context, not data
+          // severity-driven alpha: only critical is painted solid
           "fill-opacity": [
             "match", ["get", "risk_category"],
-            "low", 0.12,
-            0.6,
+            "critical", 0.65,
+            "high", 0.3,
+            "moderate", 0.2,
+            "low", 0.08,
+            0.08,
           ] as any,
         },
       },
@@ -109,7 +112,17 @@ function styleFor(vis: Vis, mode: "risk" | "before" | "after"): maplibregl.Style
         id: "muni-line",
         type: "line",
         source: "muni",
-        paint: { "line-color": "#0f172a", "line-width": 1.1 },
+        paint: {
+          "line-color": [
+            "match", ["get", "risk_category"],
+            "critical", RISK_COLOR.critical,
+            "high", RISK_COLOR.high,
+            "moderate", RISK_COLOR.moderate,
+            "low", "#64748b",
+            "#64748b",
+          ] as any,
+          "line-width": 1.1,
+        },
       },
       {
         id: "muni-sel",
