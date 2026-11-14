@@ -2,6 +2,10 @@
 
 Weighted linear blend of four normalized inputs, weights documented in
 docs/methodology.md. Screening score only — NOT a civil-defense warning.
+
+The precipitation component uses the LARGER of the observed 7-day max
+(archive) and the forecast 7-day max: forecast rain above what already fell
+is the forward-looking flood driver. Missing forecast contributes 0.
 """
 
 PRECIP_CAP_MM = 300.0      # May-2024 peak 7-day totals were ~300-360 mm
@@ -20,7 +24,11 @@ def _clamp(x: float) -> float:
 
 
 def risk_score(f: dict) -> float:
-    p = _clamp(f.get("precip_max7d_mm", 0.0) / PRECIP_CAP_MM)
+    precip_mm = max(
+        f.get("precip_max7d_mm", 0.0),
+        f.get("precip_forecast_max7d_mm", 0.0) or 0.0,
+    )
+    p = _clamp(precip_mm / PRECIP_CAP_MM)
     s = _clamp(f.get("soil_moisture_mean", 0.0) / SOIL_CAP)
     t = _clamp(f.get("sus_frac", 0.0))
     o = _clamp(f.get("flood_frac", 0.0) / FLOOD_CAP)

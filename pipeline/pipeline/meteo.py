@@ -88,3 +88,32 @@ def load_parse(lat: float, lon: float, start: str, end: str) -> dict:
 def meteo_for_point(lat: float, lon: float, start: str, end: str) -> dict:
     """Fetch + aggregate for one point, with file cache."""
     return aggregate_meteo(load_parse(lat, lon, start, end))
+
+
+FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
+
+
+def forecast_max7d(lat: float, lon: float, days: int = 7, timeout: float = 60.0) -> dict:
+    """Forward-looking 7-day precipitation max (Open-Meteo forecast API).
+
+    Returns {'precip_forecast_max7d_mm', 'n_forecast_days'}; HTTP/network
+    errors propagate — caller decides the fallback (index treats missing
+    forecast as 0).
+    """
+    import json as _json
+
+    params = {
+        "latitude": lat,
+        "longitude": lon,
+        "daily": "precipitation_sum",
+        "forecast_days": days,
+        "timezone": "America/Sao_Paulo",
+    }
+    payload = httpx.get(FORECAST_URL, params=params, timeout=timeout).json()
+    vals = payload.get("daily", {}).get("precipitation_sum") or []
+    good = [float(v) for v in vals if v is not None]
+    return {
+        "precip_forecast_max7d_mm": rolling_max(good, days),
+        "n_forecast_days": len(good),
+        "raw": _json.dumps(vals),
+    }

@@ -37,6 +37,9 @@ def build_action_plan(m: dict) -> dict:
     if m.get("precip_max7d_mm", 0) > 250:
         reasons.append(f"{m['precip_max7d_mm']:.0f} mm em 7 dias")
         actions.append("Monitorar níveis dos rios e reforçar aviso em caso de nova chuva intensa")
+    if (m.get("precip_forecast_max7d_mm", 0) or 0) > 100:
+        reasons.append(f"previsão de {m['precip_forecast_max7d_mm']:.0f} mm nos próximos 7 dias")
+        actions.append("Preparar alerta preventivo para a próxima semana — chuva prevista sobre solo já carregado")
     if m.get("soil_moisture_mean", 0) > 0.4:
         reasons.append("solo próximo da saturação")
         actions.append("Atenção a encostas e áreas de infiltração — solo saturado reduz escoamento")
