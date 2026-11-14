@@ -42,19 +42,29 @@ const base: maplibregl.StyleSpecification = {
           "low", RISK_COLOR.low,
           "#888888",
         ] as any,
-        "fill-opacity": 0.25,
+        "fill-opacity": 0.32,
       },
     },
     {
       id: "muni-line",
       type: "line",
       source: "muni",
-      paint: { "line-color": "#334155", "line-width": 0.8 },
+      paint: { "line-color": "#0f172a", "line-width": 1.1 },
     },
+    {
+      id: "muni-sel",
+      type: "line",
+      source: "muni",
+      filter: ["==", ["get", "code"], "__none__"],
+      paint: { "line-color": "#22d3ee", "line-width": 3 },
+    } as any,
   ],
 };
 
-function styleFor(side: "before" | "after", thresh: number): maplibregl.StyleSpecification {
+type Vis = { flood: boolean; mask: boolean; sus: boolean; muni: boolean };
+const show = (on: boolean) => (on ? "visible" : "none");
+
+function styleFor(side: "before" | "after", thresh: number, vis: Vis): maplibregl.StyleSpecification {
   const s = JSON.parse(JSON.stringify(base)) as maplibregl.StyleSpecification;
   const sar = side === "before" ? "sar_before" : "sar_after";
   (s.sources as any).sar = {
@@ -84,15 +94,20 @@ function styleFor(side: "before" | "after", thresh: number): maplibregl.StyleSpe
   s.layers.splice(
     1,
     0,
-    { id: "sus", type: "raster", source: "sus", layout: { visibility: "none" } } as any,
+    { id: "sus", type: "raster", source: "sus", layout: { visibility: show(vis.sus) } } as any,
     { id: "sar", type: "raster", source: "sar" } as any,
-    { id: "flood", type: "raster", source: "flood", layout: { visibility: "none" } } as any,
+    { id: "flood", type: "raster", source: "flood", layout: { visibility: show(vis.flood) } } as any,
   );
   if (side === "after") {
     s.layers.splice(
       4, 0,
-      { id: "mask", type: "raster", source: "mask", layout: { visibility: "none" } } as any,
+      { id: "mask", type: "raster", source: "mask", layout: { visibility: show(vis.mask) } } as any,
     );
+  }
+  for (const l of s.layers) {
+    if (l.id === "muni-fill" || l.id === "muni-line") {
+      (l as any).layout = { ...(l as any).layout, visibility: show(vis.muni) };
+    }
   }
   return s;
 }
@@ -108,8 +123,24 @@ export default function App() {
   const [thresh, setThresh] = useState(-17);
   const [sel, setSel] = useState<Props | null>(null);
   const [plan, setPlan] = useState<any>(null);
-  const [layers, setLayers] = useState({ flood: true, mask: false, sus: false, muni: true });
+  const [layers, setLayers] = useState<Vis>({ flood: true, mask: false, sus: false, muni: true });
+  const layersRef = useRef(layers);
   const [split, setSplit] = useState(50);
+
+  const applyVis = (m: maplibregl.Map, l: Vis) => {
+    // only set when different — styledata refires on setLayoutProperty and
+    // would loop forever if we re-set the same value
+    const v = (id: string, on: boolean) => {
+      const want = show(on);
+      if (m.getLayer(id) && m.getLayoutProperty(id, "visibility") !== want)
+        m.setLayoutProperty(id, "visibility", want);
+    };
+    v("flood", l.flood);
+    v("sus", l.sus);
+    v("mask", l.mask);
+    v("muni-fill", l.muni);
+    v("muni-line", l.muni);
+  };
 
   useEffect(() => {
     const opts = {
@@ -120,10 +151,15 @@ export default function App() {
     };
     const m1 = new maplibregl.Map({ ...opts, container: beforeRef.current! });
     const m2 = new maplibregl.Map({ ...opts, container: afterRef.current! });
-    m1.on("load", () => m1.setStyle(styleFor("before", thresh)));
-    m2.on("load", () => m2.setStyle(styleFor("after", thresh)));
+    m1.on("load", () => m1.setStyle(styleFor("before", thresh, layers)));
+    m2.on("load", () => m2.setStyle(styleFor("after", thresh, layers)));
     afterMap.current = m2;
     maps.current = [m1, m2];
+
+    // re-apply toggles whenever a (re)loaded style finishes — the old effect
+    // skipped silently while isStyleLoaded() was false and flood stayed hidden
+    m1.on("styledata", () => applyVis(m1, layersRef.current));
+    m2.on("styledata", () => applyVis(m2, layersRef.current));
 
     // keep both maps in sync (replaces maplibre-gl-compare, which needs node "events")
     let syncing = false;
@@ -144,6 +180,9 @@ export default function App() {
     };
     const cursor = (m: maplibregl.Map) => {
       m.on("click", "muni-fill", click);
+      m.on("click", (e) => {
+        if (!m.queryRenderedFeatures(e.point, { layers: ["muni-fill"] }).length) setSel(null);
+      });
       m.on("mouseenter", "muni-fill", () => (m.getCanvas().style.cursor = "pointer"));
       m.on("mouseleave", "muni-fill", () => (m.getCanvas().style.cursor = ""));
     };
@@ -166,19 +205,19 @@ export default function App() {
     ]);
   }, [thresh]);
 
-  // layer toggles on both maps
+  // layer toggles on both maps (styledata covers the not-yet-loaded case)
+  useEffect(() => {
+    layersRef.current = layers;
+    for (const m of maps.current) if (m.isStyleLoaded()) applyVis(m, layers);
+  }, [layers]);
+
+  // highlight the selected municipality outline on both maps
   useEffect(() => {
     for (const m of maps.current) {
-      if (!m.isStyleLoaded()) continue;
-      const v = (id: string, on: boolean) =>
-        m.getLayer(id) && m.setLayoutProperty(id, "visibility", on ? "visible" : "none");
-      v("flood", layers.flood);
-      v("sus", layers.sus);
-      v("mask", layers.mask);
-      v("muni-fill", layers.muni);
-      v("muni-line", layers.muni);
+      if (m.getLayer("muni-sel"))
+        m.setFilter("muni-sel", ["==", ["get", "code"], sel?.code ?? "__none__"] as any);
     }
-  }, [layers, sel]);
+  }, [sel]);
 
   return (
     <div className="app">
@@ -209,6 +248,13 @@ export default function App() {
           <input type="range" min={-25} max={-10} step={0.5} value={thresh}
             onChange={(e) => { setThresh(Number(e.target.value)); setLayers((l) => ({ ...l, mask: true })); }} />
         </label>
+        <span className="legend">
+          Risco: <i style={{ background: RISK_COLOR.critical }} />crítico
+          <i style={{ background: RISK_COLOR.high }} />alto
+          <i style={{ background: RISK_COLOR.moderate }} />moderado
+          <i style={{ background: RISK_COLOR.low }} />baixo
+        </span>
+        <span className="hint">Clique num município para ver exposição e plano de ação</span>
       </div>
 
       <div ref={wrap} className="compare">
