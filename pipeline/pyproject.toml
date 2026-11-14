@@ -8,6 +8,7 @@ dependencies = [
     "geopandas>=1.2.0",
     "h5py>=3.16.0",
     "httpx>=0.28.1",
+    "matplotlib>=3.11.2",
     "numpy>=2.5.4",
     "planetary-computer>=1.0.0",
     "pystac-client>=0.9.1",
