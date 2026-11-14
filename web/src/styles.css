@@ -40,6 +40,15 @@ header span { font-size: 12px; opacity: 0.8; }
   background: #0f172acc; color: #e2e8f0; font-size: 12px; border-radius: 4px;
 }
 .tag.left { left: 10px; } .tag.right { right: 10px; }
+.banner {
+  position: absolute; top: 44px; left: 10px; z-index: 5;
+  background: #0f172acc; color: #e2e8f0; font-size: 12.5px;
+  padding: 6px 12px; border-radius: 6px; border: 1px solid #334155;
+}
+.banner strong { color: #7dd3fc; }
+.panel .big { display: flex; align-items: baseline; gap: 8px; margin: 6px 0 2px; }
+.panel .big strong { font-size: 26px; color: #b91c1c; }
+.panel .big span { font-size: 12px; color: #64748b; }
 
 .panel {
   position: absolute; top: 110px; right: 14px; z-index: 10; width: 320px;

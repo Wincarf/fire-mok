@@ -3,6 +3,7 @@ import maplibregl from "maplibre-gl";
 import type { Vis } from "./vis";
 import { STORY, type Step } from "./story";
 import { StoryOverlay } from "./components/StoryOverlay";
+import { summarizeMunicipalities } from "./stats";
 
 const CENTER: [number, number] = [-51.15, -30.05];
 const GRAY = "rescale=-30,0";
@@ -133,6 +134,7 @@ export default function App() {
 
   const sel: Props | null =
     munis.find((f) => f.properties?.code === selCode)?.properties ?? null;
+  const summary = summarizeMunicipalities(munis);
 
   const applyVis = (m: maplibregl.Map, l: Vis) => {
     // only set when different — styledata refires on setLayoutProperty and
@@ -245,28 +247,28 @@ export default function App() {
     <div className="app">
       <header>
         <h1>Fire Mok</h1>
-        <span>Enchente Guaíba — mai/2024 · Sentinel-1 RTC (σ0 VV) · antes: 04/jun vs pico: 11/mai</span>
+        <span>A enchente de maio de 2024 no Guaíba vista por radar de satélite — arraste a linha e clique nos municípios</span>
       </header>
 
       <div className="toolbar">
         <label>
           <input type="checkbox" checked={layers.flood} onChange={(e) => setLayers({ ...layers, flood: e.target.checked })} />
-          Extensão da enchente
+          Água onde não devia estar
         </label>
         <label>
           <input type="checkbox" checked={layers.mask} onChange={(e) => setLayers({ ...layers, mask: e.target.checked })} />
-          Máscara de água (σ0)
+          Simulador de detecção
         </label>
         <label>
           <input type="checkbox" checked={layers.sus} onChange={(e) => setLayers({ ...layers, sus: e.target.checked })} />
-          Terreno suscetível
+          Áreas naturalmente inundáveis
         </label>
         <label>
           <input type="checkbox" checked={layers.muni} onChange={(e) => setLayers({ ...layers, muni: e.target.checked })} />
-          Municípios / risco
+          Municípios por risco
         </label>
-        <label className="slider">
-          Limiar σ0: {thresh} dB
+        <label className="slider" title="Limiar de retroespalhamento radar (σ0) usado para classificar água">
+          Limiar de detecção: {thresh} dB
           <input type="range" min={-25} max={-10} step={0.5} value={thresh}
             onChange={(e) => { setThresh(Number(e.target.value)); setLayers((l) => ({ ...l, mask: true })); }} />
         </label>
@@ -299,8 +301,14 @@ export default function App() {
             window.addEventListener("mouseup", up);
           }}
         />
-        <span className="tag left">BASE SECA · 04/jun (recessão)</span>
-        <span className="tag right">PICO · 11/mai (cheia)</span>
+        <span className="tag left">ÁGUA NORMAL · jun/2024 (recessão)</span>
+        <span className="tag right">PICO DA CHEIA · 11/mai/2024</span>
+        {munis.length > 0 && (
+          <div className="banner">
+            <strong>~{summary.exposed.toLocaleString("pt-BR")}</strong> pessoas potencialmente
+            afetadas · <strong>{summary.critical}</strong> municípios em risco crítico
+          </div>
+        )}
       </div>
 
       {step !== null && (
@@ -319,15 +327,19 @@ export default function App() {
         <aside className="panel">
           <button className="close" onClick={() => setSelCode(null)}>×</button>
           <h2>{sel.name}</h2>
+          <p className="big">
+            <strong>~{Number(sel.pop_exposed).toLocaleString("pt-BR")}</strong>
+            <span>pessoas potencialmente afetadas</span>
+          </p>
           <p className={`badge ${sel.risk_category}`}>
             Risco {sel.risk_category} · {Number(sel.risk).toFixed(2)}
           </p>
           <ul className="stats">
-            <li>População: {Number(sel.population).toLocaleString("pt-BR")}</li>
+            <li>População total: {Number(sel.population).toLocaleString("pt-BR")}</li>
             <li>Área alagada: {(100 * sel.flood_frac).toFixed(1)}%</li>
-            <li>Expostos (estimativa): {Number(sel.pop_exposed).toLocaleString("pt-BR")}</li>
-            <li>Chuva máx. 7d: {Number(sel.precip_max7d_mm).toFixed(0)} mm</li>
+            <li>Chuva máx. 7 dias: {Number(sel.precip_max7d_mm).toFixed(0)} mm</li>
             <li>Solo saturado: {(100 * (sel.soil_moisture_mean ?? 0)).toFixed(0)}%</li>
+            <li>Área naturalmente inundável: {(100 * (sel.sus_frac ?? 0)).toFixed(0)}%</li>
           </ul>
           {plan && (
             <>
