@@ -10,6 +10,7 @@ import rasterio
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from pipeline.municipalities import exposure_by_municipality, load_municipalities
+from pipeline.population import fetch_pop_density_grid
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 logger = logging.getLogger("build_municipalities")
@@ -34,7 +35,20 @@ def main() -> int:
     with rasterio.open(flood_tif) as src:
         mask = src.read(1) == 1
         transform, crs = src.transform, src.crs
-    expo = exposure_by_municipality(muni, mask, transform, crs)
+
+    from pipeline.aoi import get_aoi
+
+    aoi = get_aoi("guaiba")
+    density = fetch_pop_density_grid(
+        aoi.bbox, transform, crs, mask.shape,
+        DATA / "population" / "worldpop_bra_aoi.tif",
+    )
+    if density is not None:
+        logger.info("pop exposure source: WorldPop grid (summed over flooded px)")
+    else:
+        logger.info("pop exposure source: uniform-density fallback")
+
+    expo = exposure_by_municipality(muni, mask, transform, crs, pop_density=density)
     expo_path = out_dir / "municipalities_exposure_may2024.geojson"
     expo.to_file(expo_path, driver="GeoJSON")
     top = expo.nlargest(10, "pop_exposed")[["name", "flooded_m2", "flood_frac", "pop_exposed"]]

@@ -66,13 +66,21 @@ def load_municipalities() -> gpd.GeoDataFrame:
 
 
 def exposure_by_municipality(
-    muni: gpd.GeoDataFrame, mask: np.ndarray, transform: Affine, crs
+    muni: gpd.GeoDataFrame,
+    mask: np.ndarray,
+    transform: Affine,
+    crs,
+    pop_density: np.ndarray | None = None,
 ) -> gpd.GeoDataFrame:
     """Per-municipality flooded area, fraction, and exposed population.
 
-    pop_exposed assumes uniform population density inside the municipality —
-    a screening estimate, not a headcount. Mask must be in a metric projected CRS.
+    With pop_density (WorldPop grid on the same raster geometry, people per
+    pixel): pop_exposed sums the actual grid over flooded municipality pixels.
+    Without it: uniform density inside the municipality — screening estimate
+    only. Mask must be in a metric projected CRS.
     """
+    from pipeline.population import exposed_population
+
     px_area = abs(transform.a * transform.e)
     muni = muni.to_crs(crs)
     rows = []
@@ -83,6 +91,9 @@ def exposure_by_municipality(
         flooded = int((inside & mask).sum())
         total = max(int(inside.sum()), 1)
         frac = flooded / total
+        pop, method = exposed_population(
+            pop_density, inside, mask, px_area, int(row.get("population", 0)), frac
+        )
         rows.append(
             {
                 "code": row["code"],
@@ -90,7 +101,8 @@ def exposure_by_municipality(
                 "population": int(row.get("population", 0)),
                 "flooded_m2": flooded * px_area,
                 "flood_frac": frac,
-                "pop_exposed": int(round(row.get("population", 0) * frac)),
+                "pop_exposed": pop,
+                "pop_method": method,
                 "geometry": row.geometry,
             }
         )
