@@ -17,10 +17,10 @@ type Props = {
 };
 
 const CHIP: Record<keyof RiskCounts, string> = {
-  critical: "bg-error",
-  high: "bg-[#f59e0b]",
-  moderate: "bg-[#eab308]",
-  low: "bg-[#10b981]",
+  critical: "bg-[#ef4444]",
+  high: "bg-[#f97316]",
+  moderate: "bg-[#facc15]",
+  low: "bg-[#94a3b8]",
 };
 
 export function MapHud({

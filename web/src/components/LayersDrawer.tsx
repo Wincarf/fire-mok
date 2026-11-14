@@ -15,10 +15,10 @@ const LAYERS: { key: keyof Vis; name: string; chip: string; dot: string }[] = [
 ];
 
 const RISK = [
-  { label: "crítico", cls: "bg-tertiary-container" },
-  { label: "alto", cls: "bg-[#f59e0b]" },
-  { label: "moderado", cls: "bg-[#eab308]" },
-  { label: "baixo", cls: "bg-[#10b981]" },
+  { label: "crítico", cls: "bg-[#ef4444]" },
+  { label: "alto", cls: "bg-[#f97316]" },
+  { label: "moderado", cls: "bg-[#facc15]" },
+  { label: "baixo", cls: "bg-[#94a3b8]" },
 ];
 
 export function LayersDrawer({ layers, onToggle, summary, lastPass }: Props) {

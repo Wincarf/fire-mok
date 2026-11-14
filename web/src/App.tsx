@@ -34,10 +34,10 @@ const SUS_CMAP = encodeURIComponent(
   JSON.stringify({ 0: [0, 0, 0, 0], 1: [37, 99, 235, 140] })
 );
 const RISK_COLOR: Record<string, string> = {
-  critical: "#ff817a",
-  high: "#f59e0b",
-  moderate: "#eab308",
-  low: "#10b981",
+  critical: "#ef4444", // red-500
+  high: "#f97316", // orange-500 — clearly distinct from yellow
+  moderate: "#facc15", // yellow-400
+  low: "#94a3b8", // slate-400 — neutral wash, 477 munis shouldn't paint the map
 };
 
 // same filename as LAYERS["sar_before"] in api/app.py — date shown in the drawer
@@ -71,16 +71,7 @@ function styleFor(vis: Vis, mode: "risk" | "before" | "after"): maplibregl.Style
       muni: { type: "geojson", data: "/api/municipalities" },
     },
     layers: [
-      {
-        id: "osm",
-        type: "raster",
-        source: "osm",
-        // desaturated + dimmed so the risk fills read as data, not noise
-        paint: {
-          "raster-saturation": -0.7,
-          "raster-brightness-max": 0.85,
-        },
-      } as any,
+      { id: "osm", type: "raster", source: "osm" },
       {
         id: "sus",
         type: "raster",
@@ -106,7 +97,12 @@ function styleFor(vis: Vis, mode: "risk" | "before" | "after"): maplibregl.Style
             "low", RISK_COLOR.low,
             "#888888",
           ] as any,
-          "fill-opacity": 0.55,
+          // low risk reads as context, not data
+          "fill-opacity": [
+            "match", ["get", "risk_category"],
+            "low", 0.12,
+            0.6,
+          ] as any,
         },
       },
       {
