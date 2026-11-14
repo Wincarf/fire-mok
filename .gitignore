@@ -1,6 +1,9 @@
 # vendored upstream repo (re-clone: git clone --depth 1 https://github.com/K-Dense-AI/scientific-agent-skills vendor/scientific-agent-skills)
 vendor/
 
+# agent skills (re-clone: git clone --depth 1 https://github.com/K-Dense-AI/scientific-agent-skills .devin/skills)
+.devin/
+
 # data artifacts (COGs, downloads, caches)
 data/
 
