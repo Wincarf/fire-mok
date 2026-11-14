@@ -1,0 +1,41 @@
+name: monitoring update
+
+on:
+  schedule:
+    - cron: "0 12 * * *" # daily 12:00 UTC = 09:00 em Brasília
+  workflow_dispatch:
+    inputs:
+      lookback_days:
+        description: "days of S1 RTC history to search"
+        default: "14"
+
+concurrency:
+  group: monitoring-update
+  cancel-in-progress: false
+
+jobs:
+  update:
+    name: latest scene -> flood extent
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: pipeline
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.13"
+      - run: uv sync --frozen
+      # downloads scenes only when a new full-coverage pair exists;
+      # otherwise logs "up to date" and exits in seconds
+      - run: |
+          uv run python scripts/update_latest.py \
+            --lookback-days "${{ github.event.inputs.lookback_days || 14 }}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: flood-extent-latest
+          path: |
+            data/sar/flood_extent_latest.tif
+            data/vector/flood_polygons_latest.geojson
+          if-no-files-found: ignore
+          retention-days: 7
