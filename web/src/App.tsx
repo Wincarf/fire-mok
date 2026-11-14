@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import maplibregl from "maplibre-gl";
+import * as maplibregl from "maplibre-gl";
 import type { Vis } from "./vis";
 import { STORY, type Step } from "./story";
 import { StoryOverlay } from "./components/StoryOverlay";
