@@ -4,8 +4,10 @@ import type { Vis } from "./vis";
 import { STORY, type Step } from "./story";
 import { StoryOverlay } from "./components/StoryOverlay";
 import { Header } from "./components/Header";
+import { LayersDrawer } from "./components/LayersDrawer";
 import { summarizeMunicipalities } from "./stats";
 import { RISK_LABEL, ptRisk } from "./labels";
+import { sarSceneDate } from "./format";
 
 async function downloadJson(url: string, filename: string) {
   try {
@@ -31,11 +33,15 @@ const SUS_CMAP = encodeURIComponent(
   JSON.stringify({ 0: [0, 0, 0, 0], 1: [37, 99, 235, 140] })
 );
 const RISK_COLOR: Record<string, string> = {
-  critical: "#b91c1c",
-  high: "#ea580c",
+  critical: "#ff817a",
+  high: "#f59e0b",
   moderate: "#eab308",
-  low: "#22c55e",
+  low: "#10b981",
 };
+
+// same filename as LAYERS["sar_before"] in api/app.py — date shown in the drawer
+const SAR_SCENE_BEFORE =
+  "S1A_IW_GRDH_1SDV_20240604T084924_20240604T084953_054171_069681_rtc_vv_db.tif";
 
 const base: maplibregl.StyleSpecification = {
   version: 8,
@@ -335,41 +341,17 @@ export default function App() {
         onStory={() => setStep(0)}
       />
 
-      {/* Temporary layer controls — replaced by LayersDrawer in the next task */}
-      <aside className="fixed left-0 top-16 bottom-0 w-64 z-40 bg-surface-container-lowest border-r border-outline-variant overflow-y-auto no-scrollbar">
-        <div className="p-space-md flex flex-col gap-space-sm">
-          <span className="font-label-mono-xs text-label-mono-xs tracking-wider uppercase text-on-surface-variant">
-            Camadas &amp; Sensores
-          </span>
-          <label className="flex items-center gap-space-sm font-body-sm text-body-sm">
-            <input type="checkbox" checked={layers.flood} onChange={(e) => setLayers({ ...layers, flood: e.target.checked })} />
-            Água onde não devia estar
-          </label>
-          <label className="flex items-center gap-space-sm font-body-sm text-body-sm">
-            <input type="checkbox" checked={layers.mask} onChange={(e) => setLayers({ ...layers, mask: e.target.checked })} />
-            Simulador de detecção
-          </label>
-          <label className="flex items-center gap-space-sm font-body-sm text-body-sm">
-            <input type="checkbox" checked={layers.sus} onChange={(e) => setLayers({ ...layers, sus: e.target.checked })} />
-            Áreas naturalmente inundáveis
-          </label>
-          <label className="flex items-center gap-space-sm font-body-sm text-body-sm">
-            <input type="checkbox" checked={layers.muni} onChange={(e) => setLayers({ ...layers, muni: e.target.checked })} />
-            Municípios por risco
-          </label>
-          <label className="font-body-sm text-body-sm" title="Limiar de retroespalhamento radar (σ0) usado para classificar água">
-            Limiar de detecção: <span className="font-label-mono-sm text-label-mono-sm text-primary">{thresh} dB</span>
-            <input type="range" min={-25} max={-10} step={0.5} value={thresh} className="w-full"
-              onChange={(e) => { setThresh(Number(e.target.value)); setLayers((l) => ({ ...l, mask: true })); }} />
-          </label>
-          <span className="flex flex-wrap gap-x-2 gap-y-1 items-center font-label-mono-xs text-label-mono-xs text-on-surface-variant">
-            Risco: <i className="inline-block w-2.5 h-2.5 rounded-sm" style={{ background: RISK_COLOR.critical }} />crítico
-            <i className="inline-block w-2.5 h-2.5 rounded-sm ml-1" style={{ background: RISK_COLOR.high }} />alto
-            <i className="inline-block w-2.5 h-2.5 rounded-sm ml-1" style={{ background: RISK_COLOR.moderate }} />moderado
-            <i className="inline-block w-2.5 h-2.5 rounded-sm ml-1" style={{ background: RISK_COLOR.low }} />baixo
-          </span>
-        </div>
-      </aside>
+      <LayersDrawer
+        layers={layers}
+        onToggle={(k, v) => setLayers((l) => ({ ...l, [k]: v }))}
+        thresh={thresh}
+        onThresh={(v) => {
+          setThresh(v);
+          setLayers((l) => ({ ...l, mask: true }));
+        }}
+        summary={summary}
+        lastPass={sarSceneDate(SAR_SCENE_BEFORE)}
+      />
 
       <main className="pl-64 pt-16 h-full">
         <div ref={wrap} className="compare relative h-full">
