@@ -203,8 +203,8 @@ export default function App() {
       <div ref={wrap} className="compare">
         <div ref={beforeRef} className="map" />
         <div ref={afterRef} className="map" />
-        <span className="tag left">ANTES · 04/jun</span>
-        <span className="tag right">DEPOIS · 11/mai</span>
+        <span className="tag left">BASE SECA · 04/jun (recessão)</span>
+        <span className="tag right">PICO · 11/mai (cheia)</span>
       </div>
 
       {sel && (
