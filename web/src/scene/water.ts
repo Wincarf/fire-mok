@@ -35,8 +35,9 @@ vec3 waveNormal(vec2 p, float t) {
 }
 
 void main() {
-  // terrain grid: row 0 = north = +z; plane v axis runs south->north
-  vec2 mUv = vec2(vUv.x, 1.0 - vUv.y);
+  // mask row 0 = north; PlaneGeometry rotated -90deg puts v=1 on the
+  // south edge (z=-h/2) which also maps to mask row ny-1 -> vUv as-is
+  vec2 mUv = vUv;
   float mask = texture2D(uMask, mUv).r;
   if (mask < 0.5) discard;
 

@@ -147,9 +147,13 @@ export async function createWorld(canvas: HTMLCanvasElement, data: SceneData): P
     dispose() {
       cancelAnimationFrame(raf);
       rig.dispose();
-      water.dispose();
-      terrain.geometry.dispose();
-      (terrain.material as THREE.Material).dispose();
+      water.dispose(); // disposes maskTex too
+      scene.traverse((o) => {
+        const m = o as THREE.Mesh;
+        m.geometry?.dispose();
+        const mat = m.material as THREE.Material | THREE.Material[] | undefined;
+        (Array.isArray(mat) ? mat : mat ? [mat] : []).forEach((x) => x.dispose());
+      });
       composer.dispose();
       renderer.dispose();
     },
