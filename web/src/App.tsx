@@ -200,7 +200,8 @@ export default function App() {
 
     fetch("/api/municipalities")
       .then((r) => (r.ok ? r.json() : null))
-      .then((d) => d && setMunis(d.features ?? []));
+      .then((d) => d && setMunis(d.features ?? []))
+      .catch(() => {});
     return () => { m1.remove(); m2.remove(); };
   }, []);
 
@@ -217,7 +218,7 @@ export default function App() {
 
   useEffect(() => {
     if (!sel?.code) return setPlan(null);
-    fetch(`/api/plan/${sel.code}`).then((r) => (r.ok ? r.json() : null)).then(setPlan);
+    fetch(`/api/plan/${sel.code}`).then((r) => (r.ok ? r.json() : null)).then(setPlan).catch(() => {});
   }, [sel]);
 
   // threshold -> update the after-mask tiles live
