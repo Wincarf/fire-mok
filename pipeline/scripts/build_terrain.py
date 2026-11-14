@@ -18,14 +18,15 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from pipeline.aoi import get_aoi
 from pipeline.municipalities import load_municipalities
-from pipeline.terrain import slope_deg, susceptibility
+from pipeline.terrain import hand, slope_deg, susceptibility, susceptibility_hand
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 logger = logging.getLogger("build_terrain")
 
 DATA = Path(__file__).resolve().parents[2] / "data"
 PC_URL = "https://planetarycomputer.microsoft.com/api/stac/v1"
-ELEV_THRESH_M = 50.0      # Guaíba basin floodplain is ~0-30 m
+ELEV_THRESH_M = 50.0      # fallback rule (only if HAND fails): Guaíba plain ~0-30 m
+HAND_THRESH_M = 15.0      # HAND < 15 m ~ floodplain (Rennó et al. 2008)
 SLOPE_THRESH_DEG = 5.0
 
 
@@ -94,8 +95,28 @@ def main() -> int:
         )
         dem, transform, crs = dem_m, dst_transform, rasterio.crs.CRS.from_user_input(dst_crs)
 
-    sus = susceptibility(dem, transform, ELEV_THRESH_M, SLOPE_THRESH_DEG)
     slope = slope_deg(dem, transform)
+
+    # HAND-based floodplain (Rennó 2008); fallback to elev+slope on failure
+    hand_arr = np.full(dem.shape, np.nan, dtype="float32")
+    try:
+        hand_arr = hand(dem, transform, acc_thresh_cells=1000)
+        sus = (hand_arr < HAND_THRESH_M) & (slope < SLOPE_THRESH_DEG)
+        sus &= ~np.isnan(dem) & ~np.isnan(hand_arr) & ~np.isnan(slope)
+        logger.info("susceptibility: HAND < %.0f m (HAND range %.1f–%.1f m)",
+                    HAND_THRESH_M, np.nanmin(hand_arr), np.nanmax(hand_arr))
+    except Exception as exc:
+        sus = susceptibility(dem, transform, ELEV_THRESH_M, SLOPE_THRESH_DEG)
+        logger.warning("HAND failed (%s) — fell back to elev<%.0f m + slope", exc, ELEV_THRESH_M)
+
+    hand_path = ter_dir / "hand_guaiba.tif"
+    with rasterio.open(
+        hand_path, "w", driver="COG", height=hand_arr.shape[0], width=hand_arr.shape[1],
+        count=1, dtype="float32", crs=crs, transform=transform, nodata=np.nan,
+        compress="deflate",
+    ) as ds:
+        ds.write(hand_arr, 1)
+
     sus_path = ter_dir / "susceptibility_guaiba.tif"
     with rasterio.open(
         sus_path, "w", driver="COG", height=sus.shape[0], width=sus.shape[1],

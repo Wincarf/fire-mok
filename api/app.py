@@ -19,6 +19,7 @@ LAYERS = {
     "permanent_water": "context/permanent_water_guaiba.tif",
     "urban": "context/urban_guaiba.tif",
     "susceptibility": "terrain/susceptibility_guaiba.tif",
+    "hand": "terrain/hand_guaiba.tif",
     "dem": "terrain/cop_dem_glo30_guaiba.tif",
 }
 
