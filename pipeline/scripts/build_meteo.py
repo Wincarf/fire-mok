@@ -9,8 +9,9 @@ import geopandas as gpd
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from pipeline.meteo import meteo_for_point
+from pipeline.meteo import load_parse, meteo_for_point
 from pipeline.municipalities import load_municipalities
+from pipeline.power import cross_check_precip, power_for_point
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 logger = logging.getLogger("build_meteo")
@@ -23,6 +24,7 @@ def main() -> int:
     parser.add_argument("--start", default="2024-04-15")
     parser.add_argument("--end", default="2024-05-31")
     parser.add_argument("--aoi-only", action="store_true", help="only municipalities in municipalities_exposure output")
+    parser.add_argument("--skip-power", action="store_true", help="skip NASA POWER cross-check (offline)")
     args = parser.parse_args()
 
     muni = load_municipalities()
@@ -40,6 +42,17 @@ def main() -> int:
         except Exception as exc:
             logger.warning("meteo failed for %s: %s", m["name"], exc)
             f = {}
+        if not args.skip_power:
+            # NASA POWER (MERRA-2) as an independent estimate of the same rain
+            try:
+                p = power_for_point(pt.y, pt.x, args.start, args.end)
+                parsed = load_parse(pt.y, pt.x, args.start, args.end)
+                cc = cross_check_precip(parsed["precip"], p["daily"])
+                f["nasa_power_precip_max7d_mm"] = p["precip_max7d_mm"]
+                f["power_vs_openmeteo_bias_mm"] = cc["bias_mm"]
+                f["power_vs_openmeteo_maxabsdiff_mm"] = cc["max_abs_diff_mm"]
+            except Exception as exc:
+                logger.warning("POWER cross-check failed for %s: %s", m["name"], exc)
         rows.append({"code": m["code"], "name": m["name"], **f})
 
     out_dir = DATA / "vector"

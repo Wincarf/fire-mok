@@ -71,8 +71,8 @@ def aggregate_meteo(d: dict) -> dict:
     }
 
 
-def meteo_for_point(lat: float, lon: float, start: str, end: str) -> dict:
-    """Fetch + aggregate for one point, with file cache."""
+def load_parse(lat: float, lon: float, start: str, end: str) -> dict:
+    """Fetch (file-cached) + parse — exposes the daily series for cross-checks."""
     CACHE.mkdir(parents=True, exist_ok=True)
     key = CACHE / f"meteo_{lat:.3f}_{lon:.3f}_{start}_{end}.json".replace("-", "m").replace(":", "_")
     import json
@@ -82,4 +82,9 @@ def meteo_for_point(lat: float, lon: float, start: str, end: str) -> dict:
     else:
         payload = fetch_open_meteo(lat, lon, start, end)
         key.write_text(json.dumps(payload))
-    return aggregate_meteo(parse_open_meteo(payload))
+    return parse_open_meteo(payload)
+
+
+def meteo_for_point(lat: float, lon: float, start: str, end: str) -> dict:
+    """Fetch + aggregate for one point, with file cache."""
+    return aggregate_meteo(load_parse(lat, lon, start, end))
