@@ -3,6 +3,7 @@
 import json
 from pathlib import Path
 
+import numpy as np
 import rasterio
 from fastapi import FastAPI, HTTPException, Query, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -73,6 +74,26 @@ def create_app(data_dir: Path | None = None) -> FastAPI:
         )  # json keys are strings; pixels match numeric keys only
         png = img.render(img_format="PNG", colormap=cmap)
         return Response(content=png, media_type="image/png")
+
+    @app.get("/terrain/{z}/{x}/{y}.png")
+    def terrain(z: int, x: int, y: int):
+        # Terrarium raster-dem for MapLibre setTerrain(): elevation packed as
+        # h = R*256 + G + B/256 - 32768 (visualization PNGs can't drive terrain)
+        path = layer_path("dem")
+        from rio_tiler.errors import TileOutsideBounds
+
+        try:
+            with COGReader(str(path)) as cog:
+                img = cog.tile(x, y, z)
+        except TileOutsideBounds:
+            raise HTTPException(404, "tile outside dataset bounds")
+        elev = np.ma.filled(img.array[0], 0).astype("float64")  # nodata -> sea level
+        t = elev + 32768.0
+        rgb = np.stack(
+            [np.floor(t / 256.0), np.floor(t) % 256, np.floor((t - np.floor(t)) * 256)]
+        ).astype("uint8")
+        out = ImageData(rgb, assets=img.assets, crs=img.crs, bounds=img.bounds)
+        return Response(content=out.render(img_format="PNG"), media_type="image/png")
 
     @app.get("/api/municipalities")
     def municipalities():

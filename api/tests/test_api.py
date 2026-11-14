@@ -121,6 +121,23 @@ def test_tile_rescale_produces_contrast(client, tmp_path):
     assert len(np.unique(gray)) >= 2
 
 
+def test_terrain_tile_terrarium_encoding(client, tmp_path):
+    # MapLibre raster-dem terrain needs elevation packed into RGB using the
+    # Terrarium scheme: h = R*256 + G + B/256 - 32768. A plain visualization
+    # PNG (like /tiles/dem) cannot drive setTerrain().
+    _write_cog(tmp_path / "terrain/d.tif", np.full((256, 256), 100.5, dtype="float32"))
+    r = client.get("/terrain/8/91/150.png")
+    assert r.status_code == 200 and r.content[:8] == b"\x89PNG\r\n\x1a\n"
+    bands = _read_png(r.content).astype("float64")
+    h = bands[0] * 256 + bands[1] + bands[2] / 256 - 32768
+    # the tiny test COG covers a corner of the tile; nodata elsewhere -> 0 m
+    assert (np.abs(h - 100.5) < 0.5).any()
+
+
+def test_terrain_tile_outside_bounds_404(client):
+    assert client.get("/terrain/8/0/0.png").status_code == 404
+
+
 def test_tile_colormap_string_keys(client, tmp_path):
     # colormap arrives as JSON -> json.loads yields string keys; the API must
     # coerce them to numbers or no pixel matches and the tile is transparent.
