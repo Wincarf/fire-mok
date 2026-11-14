@@ -26,6 +26,19 @@ def flood_extent(
     return water_mask(after_db, thresh_db) & ~water_mask(before, thresh_db) & ~np.isnan(before)
 
 
+def filter_min_area(mask: np.ndarray, min_px: int = 25) -> np.ndarray:
+    """Drop connected blobs smaller than min_px (speckle cleanup)."""
+    from scipy import ndimage
+
+    labels, n = ndimage.label(mask)
+    if n == 0:
+        return mask
+    sizes = np.bincount(labels.ravel())
+    big = np.where(sizes >= min_px)[0]
+    big = big[big != 0]  # label 0 = background
+    return np.isin(labels, big)
+
+
 def mask_to_polygons(mask: np.ndarray, transform, crs) -> gpd.GeoDataFrame:
     geoms = [
         (shape(geom), int(val))
@@ -39,6 +52,8 @@ def write_mask_cog(mask: np.ndarray, src_profile: dict, out: Path) -> Path:
     out = Path(out)
     out.parent.mkdir(parents=True, exist_ok=True)
     profile = dict(src_profile)
+    for key in ("tiled", "blockxsize", "blockysize", "interleave"):
+        profile.pop(key, None)
     profile.update(
         driver="COG",
         dtype="uint8",

@@ -2,7 +2,7 @@ import numpy as np
 from affine import Affine
 from rasterio.crs import CRS
 
-from pipeline.water import flood_extent, mask_to_polygons, water_mask, write_mask_cog
+from pipeline.water import filter_min_area, flood_extent, mask_to_polygons, water_mask, write_mask_cog
 
 
 def test_water_mask_threshold():
@@ -34,6 +34,15 @@ def test_mask_to_polygons_counts_regions():
     gdf = mask_to_polygons(mask, transform, CRS.from_epsg(32722))
     assert len(gdf) == 2
     assert gdf.geometry.area.iloc[0] == 400.0  # 2x2 px * 10m
+
+
+def test_filter_min_area_drops_small_blobs():
+    mask = np.zeros((10, 10), dtype=bool)
+    mask[0, 0] = True              # 1-px speckle
+    mask[4:8, 4:8] = True          # 16-px blob
+    out = filter_min_area(mask, min_px=4)
+    assert not out[0, 0] and out[4:8, 4:8].all()
+    assert not out[9, 9]  # background stays False even though it's the largest component
 
 
 def test_write_mask_cog_roundtrip(tmp_path):

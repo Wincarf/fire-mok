@@ -15,6 +15,7 @@ dependencies = [
     "pytest>=9.2.0",
     "rasterio>=1.5.2",
     "rio-tiler>=9.4.13",
+    "scipy>=1.18.1",
     "titiler-core>=2.4.0",
     "uvicorn>=0.54.0",
 ]
