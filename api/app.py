@@ -3,6 +3,7 @@
 import json
 from pathlib import Path
 
+import numpy as np
 import rasterio
 from fastapi import FastAPI, HTTPException, Query, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -73,6 +74,58 @@ def create_app(data_dir: Path | None = None) -> FastAPI:
         )  # json keys are strings; pixels match numeric keys only
         png = img.render(img_format="PNG", colormap=cmap)
         return Response(content=png, media_type="image/png")
+
+    SCENE_NX = 512
+
+    def scene_grid():
+        """Common AOI grid for the cinematic scene, derived from the DEM."""
+        path = layer_path("dem")
+        with rasterio.open(path) as src:
+            w, s, e, n = transform_bounds(src.crs, 4326, *src.bounds)
+        ny = max(1, round(SCENE_NX * (n - s) / (e - w)))
+        lat0 = (s + n) / 2
+        cellsize_m = (e - w) * 111320 * np.cos(np.radians(lat0)) / SCENE_NX
+        return {"bounds": [w, s, e, n], "nx": SCENE_NX, "ny": ny, "cellsize_m": cellsize_m}
+
+    def read_grid(layer: str, grid: dict, resampling, dtype: str) -> bytes:
+        # WarpedVRT reprojects into the DEM grid — layers with slightly
+        # different extents can't just be stretched via read(out_shape)
+        from rasterio.transform import from_bounds
+        from rasterio.vrt import WarpedVRT
+
+        w, s, e, n = grid["bounds"]
+        transform = from_bounds(w, s, e, n, grid["nx"], grid["ny"])
+        with rasterio.open(layer_path(layer)) as src:
+            with WarpedVRT(
+                src,
+                crs="EPSG:4326",
+                transform=transform,
+                width=grid["nx"],
+                height=grid["ny"],
+                resampling=resampling,
+            ) as vrt:
+                arr = vrt.read(1, masked=True).filled(0)
+        return arr.astype(dtype).tobytes()
+
+    @app.get("/api/scene")
+    def scene():
+        return scene_grid()
+
+    @app.get("/api/scene/heightmap")
+    def scene_heightmap():
+        from rasterio.enums import Resampling
+
+        grid = scene_grid()
+        data = read_grid("dem", grid, Resampling.bilinear, "<f4")
+        return Response(content=data, media_type="application/octet-stream")
+
+    @app.get("/api/scene/flood")
+    def scene_flood():
+        from rasterio.enums import Resampling
+
+        grid = scene_grid()
+        data = read_grid("flood_extent", grid, Resampling.nearest, "uint8")
+        return Response(content=data, media_type="application/octet-stream")
 
     @app.get("/api/municipalities")
     def municipalities():

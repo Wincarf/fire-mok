@@ -121,6 +121,41 @@ def test_tile_rescale_produces_contrast(client, tmp_path):
     assert len(np.unique(gray)) >= 2
 
 
+def test_scene_meta(client):
+    r = client.get("/api/scene")
+    assert r.status_code == 200
+    m = r.json()
+    assert m["nx"] == 512 and m["ny"] > 0
+    assert len(m["bounds"]) == 4 and m["cellsize_m"] > 0
+
+
+def test_scene_heightmap_binary(client):
+    m = client.get("/api/scene").json()
+    r = client.get("/api/scene/heightmap")
+    assert r.status_code == 200 and len(r.content) == m["nx"] * m["ny"] * 4
+    a = np.frombuffer(r.content, dtype="<f4")
+    assert np.isfinite(a).all()  # nodata vira 0, nunca NaN
+
+
+def test_scene_flood_binary(client, tmp_path):
+    # the shared fixture writes every layer as float32 -20; a real flood
+    # extent is uint8 0/1 — write one for this test
+    mask = np.zeros((256, 256), dtype="uint8")
+    mask[:, :128] = 1
+    _write_cog(tmp_path / "sar/f.tif", mask)
+    m = client.get("/api/scene").json()
+    r = client.get("/api/scene/flood")
+    assert r.status_code == 200 and len(r.content) == m["nx"] * m["ny"]
+    a = np.frombuffer(r.content, dtype="uint8")
+    assert set(np.unique(a)) <= {0, 1}
+    assert (a == 1).any() and (a == 0).any()
+
+
+def test_scene_missing_dem_404(client, tmp_path):
+    (tmp_path / "terrain/d.tif").unlink()
+    assert client.get("/api/scene").status_code == 404
+
+
 def test_tile_colormap_string_keys(client, tmp_path):
     # colormap arrives as JSON -> json.loads yields string keys; the API must
     # coerce them to numbers or no pixel matches and the tile is transparent.
