@@ -61,6 +61,14 @@ def test_layers_manifest(client):
     assert all(e["available"] for e in r.json()["layers"])
 
 
+def test_healthz(client):
+    r = client.get("/healthz")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["status"] == "ok"
+    assert body["layers_available"] == body["layers_total"] == len(LAYERS)
+
+
 def test_municipalities_200(client):
     r = client.get("/api/municipalities")
     assert r.status_code == 200 and r.json()["type"] == "FeatureCollection"

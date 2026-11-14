@@ -37,6 +37,11 @@ def create_app(data_dir: Path | None = None) -> FastAPI:
             raise HTTPException(404, f"layer file missing: {p.name}")
         return p
 
+    @app.get("/healthz")
+    def healthz():
+        available = sum(1 for rel in LAYERS.values() if (data / rel).exists())
+        return {"status": "ok", "layers_available": available, "layers_total": len(LAYERS)}
+
     @app.get("/api/layers")
     def layers():
         out = []
