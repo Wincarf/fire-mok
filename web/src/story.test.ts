@@ -36,6 +36,20 @@ describe("story script", () => {
     }
   });
 
+  it("every step's flight params stay within MapLibre camera limits", () => {
+    for (const s of STORY) {
+      if (s.pitch !== undefined) {
+        expect(s.pitch).toBeGreaterThanOrEqual(0);
+        expect(s.pitch).toBeLessThanOrEqual(60);
+      }
+      if (s.bearing !== undefined) {
+        expect(s.bearing).toBeGreaterThanOrEqual(-180);
+        expect(s.bearing).toBeLessThanOrEqual(180);
+      }
+      if (s.duration !== undefined) expect(s.duration).toBeGreaterThan(0);
+    }
+  });
+
   it("every step has non-empty title and text", () => {
     for (const s of STORY) {
       expect(s.title.length).toBeGreaterThan(0);

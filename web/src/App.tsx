@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import maplibregl from "maplibre-gl";
+import * as maplibregl from "maplibre-gl";
 import type { Vis } from "./vis";
 import { STORY, type Step } from "./story";
 import { StoryOverlay } from "./components/StoryOverlay";
@@ -92,9 +92,40 @@ const base: maplibregl.StyleSpecification = {
 
 const show = (on: boolean) => (on ? "visible" : "none");
 
+const SKY: maplibregl.SkySpecification = {
+  "sky-color": "#87b5d9",
+  "horizon-color": "#cfe3ef",
+  "fog-color": "#a8bfcb",
+  "sky-horizon-blend": 0.9,
+  "horizon-fog-blend": 0.5,
+  "fog-ground-blend": 0.5,
+  "atmosphere-blend": 0.85,
+};
+
 function styleFor(side: "before" | "after", thresh: number, vis: Vis): maplibregl.StyleSpecification {
   const s = JSON.parse(JSON.stringify(base)) as maplibregl.StyleSpecification;
   const sar = side === "before" ? "sar_before" : "sar_after";
+  (s.sources as any).dem3d = {
+    type: "raster-dem",
+    tiles: ["/terrain/{z}/{x}/{y}.png"],
+    tileSize: 256,
+    encoding: "terrarium",
+    maxzoom: 12,
+  };
+  (s.sources as any).sat = {
+    type: "raster",
+    tiles: [
+      "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+    ],
+    tileSize: 256,
+    maxzoom: 18,
+    attribution: "Esri, Maxar, Earthstar Geographics",
+  };
+  (s.sources as any).ofm = {
+    type: "vector",
+    url: "https://tiles.openfreemap.org/planet",
+    attribution: "© OpenMapTiles © OpenStreetMap contributors",
+  };
   (s.sources as any).sar = {
     type: "raster",
     tiles: [`/tiles/${sar}/{z}/{x}/{y}.png?${GRAY}`],
@@ -122,16 +153,50 @@ function styleFor(side: "before" | "after", thresh: number, vis: Vis): maplibreg
   s.layers.splice(
     1,
     0,
+    {
+      id: "sat",
+      type: "raster",
+      source: "sat",
+      layout: { visibility: "none" },
+    } as any,
+    {
+      id: "hillshade",
+      type: "hillshade",
+      source: "dem3d",
+      layout: { visibility: "none" },
+      paint: { "hillshade-exaggeration": 0.4, "hillshade-shadow-color": "#0a0e18" },
+    } as any,
     { id: "sus", type: "raster", source: "sus", layout: { visibility: show(vis.sus) } } as any,
     { id: "sar", type: "raster", source: "sar" } as any,
     { id: "flood", type: "raster", source: "flood", layout: { visibility: show(vis.flood) } } as any,
   );
   if (side === "after") {
     s.layers.splice(
-      4, 0,
+      6, 0,
       { id: "mask", type: "raster", source: "mask", layout: { visibility: show(vis.mask) } } as any,
     );
   }
+  // extruded buildings sit on top of the data rasters (water flows around
+  // them) but below the cyan selection outline, which stays last
+  s.layers.splice(
+    s.layers.length - 1,
+    0,
+    {
+      id: "buildings",
+      type: "fill-extrusion",
+      source: "ofm",
+      "source-layer": "building",
+      minzoom: 12,
+      layout: { visibility: "none" },
+      paint: {
+        "fill-extrusion-color": "#7c8ea6",
+        "fill-extrusion-height": ["coalesce", ["get", "render_height"], 12],
+        "fill-extrusion-base": ["coalesce", ["get", "render_min_height"], 0],
+        "fill-extrusion-opacity": 0.8,
+        "fill-extrusion-vertical-gradient": true,
+      },
+    } as any,
+  );
   for (const l of s.layers) {
     if (l.id === "muni-fill" || l.id === "muni-line") {
       (l as any).layout = { ...(l as any).layout, visibility: show(vis.muni) };
@@ -164,6 +229,8 @@ export default function App() {
   const [coords, setCoords] = useState<{ lng: number; lat: number } | null>(null);
   const [zoom, setZoom] = useState(9);
   const [floodOk, setFloodOk] = useState(false);
+  const [is3d, setIs3d] = useState(false);
+  const is3dRef = useRef(is3d);
 
   const sel: Props | null =
     munis.find((f) => f.properties?.code === selCode)?.properties ?? null;
@@ -174,6 +241,7 @@ export default function App() {
     setStep(null);
     setLayers({ flood: true, mask: false, sus: false, muni: true });
     setSplit(50);
+    setIs3d(false);
   };
 
   const applyVis = (m: maplibregl.Map, l: Vis) => {
@@ -189,6 +257,24 @@ export default function App() {
     v("mask", l.mask);
     v("muni-fill", l.muni);
     v("muni-line", l.muni);
+  };
+
+  // 3D mode = terrain mesh + sky + hillshade + satellite + extruded buildings;
+  // guarded the same way as applyVis so styledata can't loop
+  const apply3d = (m: maplibregl.Map, on: boolean) => {
+    const v = (id: string, vis: boolean) => {
+      const want = show(vis);
+      if (m.getLayer(id) && m.getLayoutProperty(id, "visibility") !== want)
+        m.setLayoutProperty(id, "visibility", want);
+    };
+    v("osm", !on);
+    v("sat", on);
+    v("hillshade", on);
+    v("buildings", on);
+    if (on !== !!m.getTerrain())
+      m.setTerrain(on ? { source: "dem3d", exaggeration: 1.5 } : null);
+    const wantSky = on ? SKY : {};
+    if (JSON.stringify(m.getSky() ?? {}) !== JSON.stringify(wantSky)) m.setSky(wantSky);
   };
 
   useEffect(() => {
@@ -209,6 +295,7 @@ export default function App() {
     // skipped silently while isStyleLoaded() was false and flood stayed hidden
     const onStyleData = (m: maplibregl.Map) => {
       applyVis(m, layersRef.current);
+      apply3d(m, is3dRef.current);
       if (m.getLayer("muni-sel"))
         m.setFilter("muni-sel", ["==", ["get", "code"], selCodeRef.current ?? "__none__"] as any);
       const src = m.getSource("mask") as any;
@@ -294,11 +381,26 @@ export default function App() {
     if (step === null) return;
     const s: Step = STORY[step];
     const m = afterMap.current;
-    if (m) m.flyTo({ center: [s.camera[0], s.camera[1]], zoom: s.camera[2], bearing: 0, pitch: 0 });
+    if (m)
+      m.flyTo({
+        center: [s.camera[0], s.camera[1]],
+        zoom: s.camera[2],
+        bearing: s.bearing ?? 0,
+        pitch: s.pitch ?? 0,
+        duration: s.duration ?? 2200,
+      });
     setLayers(s.layers);
     setSplit(s.split);
     setSelCode(s.sel ?? null);
   }, [step]);
+
+  // 3D toggle — apply terrain/sky/satellite/buildings to both synced maps
+  useEffect(() => {
+    is3dRef.current = is3d;
+    for (const m of maps.current) if (m.isStyleLoaded()) apply3d(m, is3d);
+    const m = afterMap.current;
+    if (m && step === null) m.easeTo({ pitch: is3d ? 45 : 0, duration: 900 });
+  }, [is3d]);
 
   useEffect(() => {
     if (!sel?.code) return setPlan(null);
@@ -350,7 +452,10 @@ export default function App() {
         tilerMs={tilerMs}
         coords={coords}
         onExport={() => downloadJson("/api/municipalities", "municipios_risco_may2024.geojson")}
-        onStory={() => setStep(0)}
+        onStory={() => {
+          setIs3d(true);
+          setStep(0);
+        }}
       />
 
       <LayersDrawer
@@ -369,6 +474,8 @@ export default function App() {
         <MapHud
           zoom={zoom}
           onZoom={(d) => (d > 0 ? afterMap.current?.zoomIn() : afterMap.current?.zoomOut())}
+          is3d={is3d}
+          onToggle3d={() => setIs3d((v) => !v)}
           split={split}
           topAnim={step !== null && !dragging}
           beforeRef={beforeRef}

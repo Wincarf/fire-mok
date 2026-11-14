@@ -3,6 +3,8 @@ import type { RefObject, ReactNode, PointerEvent } from "react";
 type Props = {
   zoom: number;
   onZoom: (d: 1 | -1) => void;
+  is3d: boolean;
+  onToggle3d: () => void;
   split: number;
   topAnim: boolean;
   beforeRef: RefObject<HTMLDivElement | null>;
@@ -15,6 +17,8 @@ type Props = {
 export function MapHud({
   zoom,
   onZoom,
+  is3d,
+  onToggle3d,
   split,
   topAnim,
   beforeRef,
@@ -86,6 +90,19 @@ export function MapHud({
           className="w-9 h-9 rounded bg-surface-container-low hover:bg-surface-container-high border border-outline-variant text-on-surface hover:text-primary shadow-md flex items-center justify-center transition-colors"
         >
           <span className="material-symbols-outlined text-[18px]">remove</span>
+        </button>
+        <button
+          type="button"
+          onClick={onToggle3d}
+          title={is3d ? "Voltar para 2D" : "Modo 3D — terreno, satélite e prédios"}
+          aria-pressed={is3d}
+          className={`w-9 h-9 rounded border shadow-md flex items-center justify-center transition-colors ${
+            is3d
+              ? "bg-primary-container border-primary text-on-primary-container"
+              : "bg-surface-container-low hover:bg-surface-container-high border-outline-variant text-on-surface hover:text-primary"
+          }`}
+        >
+          <span className="material-symbols-outlined text-[18px]">3d_rotation</span>
         </button>
       </div>
 

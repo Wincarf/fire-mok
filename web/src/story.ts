@@ -7,6 +7,9 @@ export type Step = {
   layers: Vis;
   split: number; // % — 100 = só o "antes"; 50 = metade de cada
   sel?: string; // código IBGE do município a destacar
+  pitch?: number; // inclinação da câmera (0..60) — modo 3D
+  bearing?: number; // rotação (-180..180)
+  duration?: number; // ms do flyTo
 };
 
 const OFF: Vis = { flood: false, mask: false, sus: false, muni: false };
@@ -18,6 +21,9 @@ export const STORY: Step[] = [
     camera: [-51.15, -30.05, 9],
     layers: OFF,
     split: 100,
+    pitch: 45,
+    bearing: -20,
+    duration: 3000,
   },
   {
     title: "A chuva recorde",
@@ -25,6 +31,8 @@ export const STORY: Step[] = [
     camera: [-51.15, -30.05, 9],
     layers: OFF,
     split: 100,
+    pitch: 40,
+    bearing: -20,
   },
   {
     title: "Antes e depois",
@@ -32,6 +40,8 @@ export const STORY: Step[] = [
     camera: [-51.15, -30.05, 9],
     layers: OFF,
     split: 50,
+    pitch: 45,
+    bearing: -15,
   },
   {
     title: "Água onde não devia estar",
@@ -39,6 +49,8 @@ export const STORY: Step[] = [
     camera: [-51.2, -30.05, 10],
     layers: { ...OFF, flood: true },
     split: 50,
+    pitch: 55,
+    bearing: -25,
   },
   {
     title: "Quem foi afetado",
@@ -47,6 +59,8 @@ export const STORY: Step[] = [
     layers: { ...OFF, flood: true, muni: true },
     split: 50,
     sel: "4314902", // Porto Alegre
+    pitch: 50,
+    bearing: -10,
   },
   {
     title: "Agora é com você",
@@ -54,5 +68,7 @@ export const STORY: Step[] = [
     camera: [-51.15, -30.05, 9],
     layers: { ...OFF, flood: true, muni: true },
     split: 50,
+    pitch: 35,
+    bearing: 0,
   },
 ];
