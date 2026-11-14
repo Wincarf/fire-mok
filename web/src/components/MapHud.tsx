@@ -1,66 +1,53 @@
-import type { RefObject, ReactNode, PointerEvent } from "react";
+import type { RefObject, ReactNode } from "react";
+import { RISK_LABEL } from "../labels";
+import type { RiskCounts } from "../stats";
 
 type Props = {
   zoom: number;
   onZoom: (d: 1 | -1) => void;
-  split: number;
-  topAnim: boolean;
-  beforeRef: RefObject<HTMLDivElement | null>;
-  afterRef: RefObject<HTMLDivElement | null>;
+  mapRef: RefObject<HTMLDivElement | null>;
   containerRef: RefObject<HTMLDivElement | null>;
-  onDividerDown: (e: PointerEvent<HTMLDivElement>) => void;
+  counts: RiskCounts;
   children?: ReactNode;
 };
 
-export function MapHud({
-  zoom,
-  onZoom,
-  split,
-  topAnim,
-  beforeRef,
-  afterRef,
-  containerRef,
-  onDividerDown,
-  children,
-}: Props) {
+const CHIP: Record<keyof RiskCounts, string> = {
+  critical: "bg-error",
+  high: "bg-[#f59e0b]",
+  moderate: "bg-[#eab308]",
+  low: "bg-[#10b981]",
+};
+
+export function MapHud({ zoom, onZoom, mapRef, containerRef, counts, children }: Props) {
   return (
     <div
       ref={containerRef}
       className="relative h-full overflow-hidden select-none cursor-crosshair bg-surface-container-lowest"
     >
-      <div ref={beforeRef} className="map-canvas" />
-      <div
-        ref={afterRef}
-        className={`map-canvas z-[2]${topAnim ? " divider-anim" : ""}`}
-        style={{ clipPath: `inset(0 0 0 ${split}%)` }}
-      />
+      <div ref={mapRef} className="map-canvas" />
 
-      {/* Floating legend pills — recessão (esq) vs pico (dir) */}
+      {/* Risk legend — counts come from the real /api/municipalities payload */}
       <div className="absolute top-space-md left-space-md z-20 flex items-center gap-space-sm pointer-events-none">
-        <div className="px-space-md py-space-xs rounded bg-surface-container-lowest/90 backdrop-blur-md border border-outline-variant flex items-center gap-space-sm">
-          <span className="w-2.5 h-2.5 rounded-full bg-primary" />
+        <div className="px-space-md py-space-xs rounded bg-surface-container-lowest/90 backdrop-blur-md border border-outline-variant flex items-center gap-space-md">
           <span className="font-label-mono-xs text-label-mono-xs text-on-surface font-semibold tracking-wider">
-            RECESSÃO · 04/JUN/24
+            RISCO MUNICIPAL
           </span>
-        </div>
-        <div className="px-space-md py-space-xs rounded bg-surface-container-lowest/90 backdrop-blur-md border border-outline-variant flex items-center gap-space-sm">
-          <span className="w-2.5 h-2.5 rounded-full bg-error animate-pulse" />
-          <span className="font-label-mono-xs text-label-mono-xs text-on-surface font-semibold tracking-wider">
-            PICO SAR · 11/MAI/24
-          </span>
+          {(Object.keys(CHIP) as (keyof RiskCounts)[]).map((k) => (
+            <span key={k} className="flex items-center gap-1.5 font-label-mono-xs text-label-mono-xs">
+              <span className={`w-2.5 h-2.5 rounded-sm ${CHIP[k]}`} />
+              <span className="text-on-surface-variant">{RISK_LABEL[k]}</span>
+              <span className="text-primary font-medium">{counts[k]}</span>
+            </span>
+          ))}
         </div>
       </div>
 
-      {/* Telemetry HUD — only real values: S1 IW GRD 10m, VV pol, live zoom */}
+      {/* Telemetry — only real values: live zoom */}
       <div className="absolute top-space-md right-space-md z-20 hidden lg:flex items-center pointer-events-none">
         <div className="px-space-md py-space-xs rounded bg-surface-container-lowest/90 backdrop-blur-md border border-outline-variant flex items-center gap-space-md font-label-mono-xs text-label-mono-xs">
           <div>
-            <span className="text-outline">RES:</span>{" "}
-            <span className="text-primary font-medium">10m SAR IW</span>
-          </div>
-          <div>
-            <span className="text-outline">POL:</span>{" "}
-            <span className="text-on-surface font-medium">VV</span>
+            <span className="text-outline">FONTE:</span>{" "}
+            <span className="text-on-surface font-medium">S1 SAR + DEM + IBGE</span>
           </div>
           <div>
             <span className="text-outline">Z:</span>{" "}
@@ -87,20 +74,6 @@ export function MapHud({
         >
           <span className="material-symbols-outlined text-[18px]">remove</span>
         </button>
-      </div>
-
-      {/* Swipe divider — centered on the clip boundary (group is ~32px wide) */}
-      <div
-        className={`absolute top-0 bottom-0 z-30 flex items-center justify-center cursor-ew-resize group -translate-x-1/2${
-          topAnim ? " divider-anim" : ""
-        }`}
-        style={{ left: `${split}%` }}
-        onPointerDown={onDividerDown}
-      >
-        <div className="w-0.5 h-full bg-primary shadow-[0_0_12px_#4cd7f6]" />
-        <div className="absolute w-8 h-8 rounded-full bg-surface-container-high border border-outline-variant shadow-xl flex items-center justify-center text-primary transition-transform group-hover:scale-110">
-          <span className="material-symbols-outlined text-[18px]">drag_indicator</span>
-        </div>
       </div>
 
       {children}

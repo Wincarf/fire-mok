@@ -3,7 +3,7 @@ import { STORY } from "./story";
 import { summarizeMunicipalities } from "./stats";
 import { RISK_LABEL, ptRisk } from "./labels";
 
-const VIS_KEYS = ["flood", "mask", "sus", "muni"];
+const VIS_KEYS = ["flood", "sus", "muni"];
 
 describe("story script", () => {
   it("has 6 steps", () => {
@@ -26,13 +26,6 @@ describe("story script", () => {
       expect(Number.isFinite(z)).toBe(true);
       expect(z).toBeGreaterThanOrEqual(6);
       expect(z).toBeLessThanOrEqual(13);
-    }
-  });
-
-  it("every step's split is within 0..100", () => {
-    for (const s of STORY) {
-      expect(s.split).toBeGreaterThanOrEqual(0);
-      expect(s.split).toBeLessThanOrEqual(100);
     }
   });
 

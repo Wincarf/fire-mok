@@ -4,17 +4,14 @@ import { SAR_PLATFORM } from "../format";
 type Props = {
   layers: Vis;
   onToggle: (k: keyof Vis, v: boolean) => void;
-  thresh: number;
-  onThresh: (v: number) => void;
   summary: { exposed: number; critical: number };
   lastPass: string;
 };
 
 const LAYERS: { key: keyof Vis; name: string; chip: string; dot: string }[] = [
-  { key: "flood", name: "Água onde não devia estar", chip: "SAR", dot: "bg-primary" },
-  { key: "mask", name: "Simulador de detecção", chip: "σ0", dot: "bg-secondary" },
-  { key: "sus", name: "Áreas naturalmente inundáveis", chip: "DEM", dot: "bg-tertiary-container" },
   { key: "muni", name: "Municípios por risco", chip: "IBGE", dot: "bg-error" },
+  { key: "flood", name: "Água onde não devia estar", chip: "SAR", dot: "bg-primary" },
+  { key: "sus", name: "Áreas naturalmente inundáveis", chip: "DEM", dot: "bg-tertiary-container" },
 ];
 
 const RISK = [
@@ -24,7 +21,7 @@ const RISK = [
   { label: "baixo", cls: "bg-[#10b981]" },
 ];
 
-export function LayersDrawer({ layers, onToggle, thresh, onThresh, summary, lastPass }: Props) {
+export function LayersDrawer({ layers, onToggle, summary, lastPass }: Props) {
   return (
     <aside className="fixed left-0 top-16 bottom-0 w-64 z-40 bg-surface-container-lowest border-r border-outline-variant flex flex-col justify-between">
       <div className="p-space-md flex flex-col gap-space-md overflow-y-auto no-scrollbar">
@@ -56,31 +53,6 @@ export function LayersDrawer({ layers, onToggle, thresh, onThresh, summary, last
               </span>
             </label>
           ))}
-        </div>
-
-        <div className="px-space-sm">
-          <div className="flex items-center justify-between">
-            <span className="font-label-mono-xs text-label-mono-xs uppercase tracking-wider text-on-surface-variant">
-              Limiar σ0 (backscatter)
-            </span>
-            <span className="font-label-mono-sm text-label-mono-sm text-primary font-medium">
-              {thresh.toFixed(1)} dB
-            </span>
-          </div>
-          <input
-            type="range"
-            min={-25}
-            max={-10}
-            step={0.5}
-            value={thresh}
-            onChange={(e) => onThresh(Number(e.target.value))}
-            className="w-full mt-space-xs accent-primary"
-            title="Limiar de retroespalhamento radar (σ0) usado para classificar água"
-          />
-          <div className="flex justify-between font-label-mono-xs text-label-mono-xs text-outline">
-            <span>-25 dB (sensível)</span>
-            <span>-10 dB (conserv.)</span>
-          </div>
         </div>
 
         <div className="px-space-sm">

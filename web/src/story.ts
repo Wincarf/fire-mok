@@ -5,54 +5,47 @@ export type Step = {
   text: string;
   camera: [number, number, number]; // [lng, lat, zoom]
   layers: Vis;
-  split: number; // % — 100 = só o "antes"; 50 = metade de cada
   sel?: string; // código IBGE do município a destacar
 };
 
-const OFF: Vis = { flood: false, mask: false, sus: false, muni: false };
+const RISK: Vis = { flood: false, sus: false, muni: true };
 
 export const STORY: Step[] = [
   {
-    title: "A região por radar",
-    text: "Esta é a região metropolitana de Porto Alegre vista por radar de satélite — ele enxerga a superfície mesmo debaixo de nuvens.",
+    title: "A região em risco",
+    text: "Região metropolitana de Porto Alegre. Cada município está colorido pelo nível de risco calculado — de baixo (verde) a crítico (vermelho).",
     camera: [-51.15, -30.05, 9],
-    layers: OFF,
-    split: 100,
+    layers: RISK,
   },
   {
     title: "A chuva recorde",
     text: "Em maio de 2024 choveu em poucos dias o que costuma chover em meses — mais de 600 mm em parte da região, com o solo já saturado.",
     camera: [-51.15, -30.05, 9],
-    layers: OFF,
-    split: 100,
-  },
-  {
-    title: "Antes e depois",
-    text: "Compare os dois lados: à esquerda, a água em situação normal (junho); à direita, o pico da enchente em 11 de maio. Água aparece escura no radar.",
-    camera: [-51.15, -30.05, 9],
-    layers: OFF,
-    split: 50,
+    layers: RISK,
   },
   {
     title: "Água onde não devia estar",
-    text: "Em vermelho: área que estava seca e ficou submersa — cerca de 3 milhões de pixels, ~5% da região. O Guaíba e os rios Gravataí e Jacuí transbordaram.",
+    text: "Em vermelho: área que estava seca e ficou submersa no pico de 11 de maio, detectada por radar de satélite — o Guaíba e os rios Gravataí e Jacuí transbordaram.",
     camera: [-51.2, -30.05, 10],
-    layers: { ...OFF, flood: true },
-    split: 50,
+    layers: { ...RISK, flood: true },
+  },
+  {
+    title: "Onde a água sempre vai",
+    text: "Em azul: áreas naturalmente inundáveis segundo o terreno (DEM). Onde o azul encontra o vermelho, a enchente seguiu a lógica do relevo.",
+    camera: [-51.2, -30.05, 10],
+    layers: { ...RISK, flood: true, sus: true },
   },
   {
     title: "Quem foi afetado",
-    text: "As cores dos municípios mostram o nível de risco calculado — enchente observada, chuva, solo saturado e terreno. Clique num deles para ver exposição e plano de ação.",
+    text: "Clique num município para ver exposição e plano de ação. Os vermelhos concentram a maior parte da população exposta.",
     camera: [-51.23, -30.03, 9.5],
-    layers: { ...OFF, flood: true, muni: true },
-    split: 50,
+    layers: { ...RISK, flood: true },
     sel: "4314902", // Porto Alegre
   },
   {
     title: "Agora é com você",
-    text: "Explore os mapas, mexa no limiar de detecção e clique nos municípios. Cada município tem um plano de ação sugerido.",
+    text: "Explore o mapa, ligue e desligue as camadas e clique nos municípios. Cada um tem um plano de ação sugerido.",
     camera: [-51.15, -30.05, 9],
-    layers: { ...OFF, flood: true, muni: true },
-    split: 50,
+    layers: { ...RISK, flood: true },
   },
 ];
