@@ -71,9 +71,15 @@ Steps da story mapeiam para keyframes de câmera (lng/lat/zoom + pitch/bearing �
 - Overpass falha/timeout → terreno+água renderizam, aviso "prédios indisponíveis"
 - WebGL indisponível → mensagem + fechar
 
-### Poster
+### Poster (modo foto)
 
-Composição fixa dramática (chamada minha): câmera baixa sobre o rio em diagonal, cidade ao fundo, água da enchente em primeiro plano. 3840×2160, sombras em alta, supersample 2× se a GPU aguentar. PNG via download.
+Export **por clique, da visão atual** — imagens ilimitadas: o usuário enquadra a cena e cada clique baixa um PNG 3840×2160 novo. 3–4 presets de enquadramento curados como atalhos de câmera (ex.: "rio em primeiro plano", "aérea da cidade"). Sombras em alta + supersample 2× se a GPU aguentar. PNG via download.
+
+### Performance (requisito)
+
+- `three` carregado por `import()` dinâmico — zero custo de bundle até o primeiro uso
+- A cena só renderiza com o overlay aberto; ao fechar: para o RAF loop, dispõe geometrias/texturas/renderer
+- Export é um render único sob demanda (~200–500ms), nunca em loop
 
 ### Chamadas do builder
 
