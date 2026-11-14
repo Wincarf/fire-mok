@@ -1,92 +1,176 @@
-* { margin: 0; box-sizing: border-box; }
-body { font-family: system-ui, sans-serif; }
-.app { display: flex; flex-direction: column; height: 100vh; position: relative; }
+@import "tailwindcss";
 
-header {
-  padding: 8px 14px; background: #0f172a; color: #e2e8f0;
-  display: flex; align-items: baseline; gap: 14px;
-}
-header h1 { font-size: 18px; color: #38bdf8; }
-header span { font-size: 12px; opacity: 0.8; }
+/* Design tokens — "Hydrologic Risk & Geospatial Command" (Stitch export).
+   Names mirror the mockup's tailwind.config so its classes port verbatim. */
+@theme {
+  --color-surface: #0f131d;
+  --color-surface-dim: #0f131d;
+  --color-surface-bright: #353944;
+  --color-surface-container-lowest: #0a0e18;
+  --color-surface-container-low: #171b26;
+  --color-surface-container: #1c1f2a;
+  --color-surface-container-high: #262a35;
+  --color-surface-container-highest: #313540;
+  --color-surface-variant: #313540;
+  --color-surface-tint: #4cd7f6;
+  --color-background: #0f131d;
+  --color-on-surface: #dfe2f1;
+  --color-on-surface-variant: #bcc9cd;
+  --color-on-background: #dfe2f1;
+  --color-inverse-surface: #dfe2f1;
+  --color-inverse-on-surface: #2c303b;
+  --color-outline: #869397;
+  --color-outline-variant: #3d494c;
 
-.toolbar {
-  display: flex; gap: 18px; align-items: center; flex-wrap: wrap;
-  padding: 8px 14px; background: #1e293b; color: #e2e8f0; font-size: 13px;
-}
-.toolbar label { display: flex; gap: 6px; align-items: center; }
-.toolbar .slider input { width: 140px; }
-.legend { display: flex; gap: 4px; align-items: center; font-size: 12px; opacity: 0.9; }
-.legend i { display: inline-block; width: 11px; height: 11px; border-radius: 2px; margin-left: 8px; margin-right: 2px; }
-.hint { font-size: 12px; color: #7dd3fc; margin-left: auto; }
+  --color-primary: #4cd7f6;
+  --color-on-primary: #003640;
+  --color-primary-container: #06b6d4;
+  --color-on-primary-container: #00424f;
+  --color-primary-fixed: #acedff;
+  --color-primary-fixed-dim: #4cd7f6;
+  --color-on-primary-fixed: #001f26;
+  --color-on-primary-fixed-variant: #004e5c;
+  --color-inverse-primary: #00687a;
 
-.compare { position: relative; flex: 1; }
-.map { position: absolute; inset: 0; }
-.map.top { z-index: 2; }
-.map.top.anim { transition: clip-path 0.8s ease; }
-.divider.anim { transition: left 0.8s ease; }
-.divider {
-  position: absolute; top: 0; bottom: 0; width: 4px; z-index: 6;
-  background: #38bdf8; cursor: ew-resize; transform: translateX(-2px);
-  box-shadow: 0 0 6px #0008;
-}
-.divider::after {
-  content: "⇔"; position: absolute; top: 50%; left: 50%;
-  transform: translate(-50%, -50%); background: #38bdf8; color: #0f172a;
-  border-radius: 50%; width: 28px; height: 28px; display: grid;
-  place-items: center; font-size: 14px;
-}
-.tag {
-  position: absolute; top: 10px; z-index: 5; padding: 4px 10px;
-  background: #0f172acc; color: #e2e8f0; font-size: 12px; border-radius: 4px;
-}
-.tag.left { left: 10px; } .tag.right { right: 10px; }
-.banner {
-  position: absolute; top: 44px; left: 10px; z-index: 5;
-  background: #0f172acc; color: #e2e8f0; font-size: 12.5px;
-  padding: 6px 12px; border-radius: 6px; border: 1px solid #334155;
-}
-.banner strong { color: #7dd3fc; }
-.panel .big { display: flex; align-items: baseline; gap: 8px; margin: 6px 0 2px; }
-.panel .big strong { font-size: 26px; color: #b91c1c; }
-.panel .big span { font-size: 12px; color: #64748b; }
+  --color-secondary: #7bd0ff;
+  --color-on-secondary: #00354a;
+  --color-secondary-container: #00a6e0;
+  --color-on-secondary-container: #00374d;
+  --color-secondary-fixed: #c4e7ff;
+  --color-secondary-fixed-dim: #7bd0ff;
+  --color-on-secondary-fixed: #001e2c;
+  --color-on-secondary-fixed-variant: #004c69;
 
-.panel {
-  position: absolute; top: 110px; right: 14px; z-index: 10; width: 320px;
-  max-height: calc(100vh - 140px); overflow: auto;
-  background: #fff; border-radius: 10px; padding: 14px 16px;
-  box-shadow: 0 8px 30px #0003; font-size: 13px;
-}
-.panel h2 { font-size: 17px; }
-.panel h3 { font-size: 13px; margin-top: 10px; }
-.panel .close {
-  position: absolute; top: 8px; right: 10px; border: 0;
-  background: none; font-size: 18px; cursor: pointer;
-}
-.badge { display: inline-block; margin: 6px 0; padding: 3px 10px; border-radius: 999px; color: #fff; font-size: 12px; }
-.badge.critical { background: #b91c1c; } .badge.high { background: #ea580c; }
-.badge.moderate { background: #ca8a04; } .badge.low { background: #16a34a; }
-.stats { list-style: none; margin: 8px 0; }
-.stats li { padding: 2px 0; border-bottom: 1px solid #e2e8f0; }
-.reasons { margin: 6px 0 0 16px; color: #64748b; }
-.actions { margin: 6px 0 0 20px; }
-.actions li { margin: 4px 0; }
+  --color-tertiary: #ffb3ad;
+  --color-on-tertiary: #68000a;
+  --color-tertiary-container: #ff817a;
+  --color-on-tertiary-container: #7e000f;
+  --color-tertiary-fixed: #ffdad7;
+  --color-tertiary-fixed-dim: #ffb3ad;
+  --color-on-tertiary-fixed: #410004;
+  --color-on-tertiary-fixed-variant: #930013;
 
-.story {
-  position: absolute; left: 50%; bottom: 26px; transform: translateX(-50%);
-  z-index: 20; width: min(480px, 90%); padding: 16px 20px;
-  background: #0f172aee; color: #e2e8f0; border-radius: 12px;
-  box-shadow: 0 10px 40px #0008; border: 1px solid #334155;
+  --color-error: #ffb4ab;
+  --color-on-error: #690005;
+  --color-error-container: #93000a;
+  --color-on-error-container: #ffdad6;
+
+  /* Type families — Geist for UI text, JetBrains Mono for metrics/labels */
+  --font-display-lg: "Geist", system-ui, sans-serif;
+  --font-display-lg-mobile: "Geist", system-ui, sans-serif;
+  --font-headline-lg: "Geist", system-ui, sans-serif;
+  --font-headline-md: "Geist", system-ui, sans-serif;
+  --font-headline-sm: "Geist", system-ui, sans-serif;
+  --font-body-lg: "Geist", system-ui, sans-serif;
+  --font-body-md: "Geist", system-ui, sans-serif;
+  --font-body-sm: "Geist", system-ui, sans-serif;
+  --font-metric-xl: "JetBrains Mono", ui-monospace, monospace;
+  --font-metric-lg: "JetBrains Mono", ui-monospace, monospace;
+  --font-label-mono-md: "JetBrains Mono", ui-monospace, monospace;
+  --font-label-mono-sm: "JetBrains Mono", ui-monospace, monospace;
+  --font-label-mono-xs: "JetBrains Mono", ui-monospace, monospace;
+
+  /* Type scale — fontSize + lineHeight + tracking + weight (verbatim) */
+  --text-display-lg: 36px;
+  --text-display-lg--line-height: 44px;
+  --text-display-lg--letter-spacing: -0.02em;
+  --text-display-lg--font-weight: 600;
+  --text-display-lg-mobile: 28px;
+  --text-display-lg-mobile--line-height: 36px;
+  --text-display-lg-mobile--letter-spacing: -0.02em;
+  --text-display-lg-mobile--font-weight: 600;
+  --text-headline-lg: 24px;
+  --text-headline-lg--line-height: 32px;
+  --text-headline-lg--letter-spacing: -0.01em;
+  --text-headline-lg--font-weight: 600;
+  --text-headline-md: 20px;
+  --text-headline-md--line-height: 28px;
+  --text-headline-md--font-weight: 500;
+  --text-headline-sm: 16px;
+  --text-headline-sm--line-height: 24px;
+  --text-headline-sm--font-weight: 500;
+  --text-body-lg: 16px;
+  --text-body-lg--line-height: 24px;
+  --text-body-lg--font-weight: 400;
+  --text-body-md: 14px;
+  --text-body-md--line-height: 20px;
+  --text-body-md--font-weight: 400;
+  --text-body-sm: 12px;
+  --text-body-sm--line-height: 16px;
+  --text-body-sm--font-weight: 400;
+  --text-metric-xl: 32px;
+  --text-metric-xl--line-height: 36px;
+  --text-metric-xl--letter-spacing: -0.02em;
+  --text-metric-xl--font-weight: 600;
+  --text-metric-lg: 20px;
+  --text-metric-lg--line-height: 26px;
+  --text-metric-lg--letter-spacing: -0.01em;
+  --text-metric-lg--font-weight: 500;
+  --text-label-mono-md: 13px;
+  --text-label-mono-md--line-height: 18px;
+  --text-label-mono-md--font-weight: 500;
+  --text-label-mono-sm: 11px;
+  --text-label-mono-sm--line-height: 14px;
+  --text-label-mono-sm--letter-spacing: 0.04em;
+  --text-label-mono-sm--font-weight: 400;
+  --text-label-mono-xs: 10px;
+  --text-label-mono-xs--line-height: 12px;
+  --text-label-mono-xs--letter-spacing: 0.06em;
+  --text-label-mono-xs--font-weight: 500;
+
+  /* Spacing scale (verbatim) */
+  --spacing-space-xs: 0.25rem;
+  --spacing-space-sm: 0.5rem;
+  --spacing-space-md: 0.75rem;
+  --spacing-space-lg: 1rem;
+  --spacing-space-xl: 1.5rem;
+  --spacing-gutter: 0.75rem;
+  --spacing-gutter-desktop: 1rem;
+  --spacing-margin: 0.75rem;
+  --spacing-margin-desktop: 1.25rem;
+
+  /* Radii — Level 1 (Soft): 4px controls, 8px cards */
+  --radius-sm: 0.125rem;
+  --radius: 0.125rem;
+  --radius-lg: 0.25rem;
+  --radius-xl: 0.5rem;
 }
-.story-count { font-size: 11px; letter-spacing: 1px; color: #7dd3fc; }
-.story h2 { font-size: 18px; margin: 4px 0 6px; }
-.story p { font-size: 14px; line-height: 1.45; margin: 0 0 12px; }
-.story-nav { display: flex; gap: 8px; justify-content: flex-end; }
-.story-nav button {
-  border: 0; border-radius: 8px; padding: 7px 14px; font-size: 13px; cursor: pointer;
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  body {
+    @apply bg-surface text-on-surface font-body-md text-body-md antialiased;
+    overscroll-behavior: none;
+    font-variant-numeric: tabular-nums;
+  }
+  ::-webkit-scrollbar {
+    display: none;
+  }
 }
-.story-nav .primary { background: #38bdf8; color: #0f172a; font-weight: 600; }
-.story-nav .ghost { background: #334155; color: #e2e8f0; }
-.story-btn {
-  border: 1px solid #38bdf8; background: #38bdf822; color: #7dd3fc;
-  border-radius: 8px; padding: 4px 12px; font-size: 12px; cursor: pointer;
+
+/* MapLibre canvas fill (map containers get this + an absolute wrapper) */
+.map-canvas {
+  position: absolute;
+  inset: 0;
+}
+.map-canvas .maplibregl-canvas {
+  outline: none;
+}
+
+/* Swipe transition used while the story drives the divider */
+.divider-anim {
+  transition:
+    clip-path 0.8s ease,
+    left 0.8s ease;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  scrollbar-width: none;
 }
