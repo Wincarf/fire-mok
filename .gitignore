@@ -1,0 +1,18 @@
+# vendored upstream repo (re-clone: git clone --depth 1 https://github.com/K-Dense-AI/scientific-agent-skills vendor/scientific-agent-skills)
+vendor/
+
+# data artifacts (COGs, downloads, caches)
+data/
+
+# python
+.venv/
+__pycache__/
+*.pyc
+
+# node
+node_modules/
+dist/
+
+# env / secrets
+.env
+.netrc
