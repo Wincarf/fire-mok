@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 
 import geopandas as gpd
+import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -40,8 +41,27 @@ def main() -> int:
         try:
             f = meteo_for_point(pt.y, pt.x, args.start, args.end)
         except Exception as exc:
-            logger.warning("meteo failed for %s: %s", m["name"], exc)
+            # Open-Meteo unavailable (429/5xx): NASA POWER MERRA-2 daily
+            # precip as the documented fallback; soil moisture unknown ->
+            # nan, risk_score treats unknowns as 0 and provenance marks it
+            logger.warning("open-meteo failed for %s (%s); POWER fallback", m["name"], exc)
             f = {}
+            if not args.skip_power:
+                try:
+                    p = power_for_point(pt.y, pt.x, args.start, args.end)
+                    vals = list(p["daily"].values())
+                    f = {
+                        "precip_total_mm": p["precip_total_mm"],
+                        "precip_max7d_mm": p["precip_max7d_mm"],
+                        "precip_max_day_mm": float(np.max(vals)) if vals else 0.0,
+                        "soil_moisture_mean": np.nan,
+                        "soil_moisture_max": np.nan,
+                        "n_days": p["n_days"],
+                        "missing_frac": p["n_missing"] / max(p["n_days"], 1),
+                        "precip_source": "NASA POWER MERRA-2 (fallback)",
+                    }
+                except Exception as exc2:
+                    logger.warning("POWER fallback also failed for %s: %s", m["name"], exc2)
         if not args.skip_power:
             # NASA POWER (MERRA-2) as an independent estimate of the same rain
             try:

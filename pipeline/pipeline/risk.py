@@ -23,13 +23,23 @@ def _clamp(x: float) -> float:
     return max(0.0, min(1.0, x))
 
 
+def _num(v) -> float:
+    """Unknown input (None/nan/invalid) contributes 0 — provenance fields
+    (precip_source, missing_frac) carry the caveat, the score stays finite."""
+    try:
+        x = float(v)
+    except (TypeError, ValueError):
+        return 0.0
+    return 0.0 if x != x else x  # nan != nan
+
+
 def risk_score(f: dict) -> float:
     precip_mm = max(
-        f.get("precip_max7d_mm", 0.0),
-        f.get("precip_forecast_max7d_mm", 0.0) or 0.0,
+        _num(f.get("precip_max7d_mm")),
+        _num(f.get("precip_forecast_max7d_mm")),
     )
     p = _clamp(precip_mm / PRECIP_CAP_MM)
-    s = _clamp(f.get("soil_moisture_mean", 0.0) / SOIL_CAP)
+    s = _clamp(_num(f.get("soil_moisture_mean")) / SOIL_CAP)
     t = _clamp(f.get("sus_frac", 0.0))
     o = _clamp(f.get("flood_frac", 0.0) / FLOOD_CAP)
     return _clamp(

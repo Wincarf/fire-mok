@@ -99,7 +99,7 @@ def create_app(data_dir: Path | None = None) -> FastAPI:
             raise HTTPException(404, f"no plan for municipality {code}")
         return plans[code]
 
-    @app.get("/api/flood_polygons")
+    @app.api_route("/api/flood_polygons", methods=["GET", "HEAD"])  # HEAD: web usa para habilitar export
     def flood_polygons():
         p = data / "vector" / "flood_polygons_may2024.geojson"
         if not p.exists():

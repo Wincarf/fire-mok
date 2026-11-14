@@ -11,9 +11,20 @@ import { Timeline } from "./components/Timeline";
 import { summarizeMunicipalities, countByCategory } from "./stats";
 import { sarSceneDate } from "./format";
 
+// ABSOLUTE URL that respects the deploy base (GH Pages builds at /fire-mok/).
+// MapLibre fetches GeoJSON/vector sources inside a blob-URL worker where
+// relative paths don't resolve — every URL handed to a style source must be
+// absolute. new URL() would percent-encode the {z}/{x}/{y} tile templates, so
+// template URLs are normalized manually (origin + base + template literal).
+const withBase = (p: string) => {
+  const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+  if (p.includes("{")) return `${window.location.origin}${base}${p}`;
+  return new URL(`${base}${p}`, window.location.href).href;
+};
+
 async function downloadJson(url: string, filename: string) {
   try {
-    const r = await fetch(url);
+    const r = await fetch(withBase(url));
     if (!r.ok) return;
     const blob = await r.blob();
     const a = document.createElement("a");
@@ -47,6 +58,12 @@ const SAR_SCENE_BEFORE =
 const show = (on: boolean) => (on ? "visible" : "none");
 const GRAY = "rescale=-30,0";
 
+// empty geojson placeholder — real data is pushed via setData() after the
+// React fetch lands (MapLibre's worker-side URL fetch is fragile: blob-worker
+// scope can't resolve relative URLs, and the request never reaches the API)
+const EMPTY_FC = { type: "FeatureCollection", features: [] } as any;
+const fedSources = new WeakSet<object>(); // don't setData the same source twice
+
 // mode "risk" = basemap + choropleth only; "before"/"after" add the SAR scene
 function styleFor(vis: Vis, mode: "risk" | "before" | "after"): maplibregl.StyleSpecification {
   const s: maplibregl.StyleSpecification = {
@@ -60,15 +77,15 @@ function styleFor(vis: Vis, mode: "risk" | "before" | "after"): maplibregl.Style
       },
       flood: {
         type: "raster",
-        tiles: [`/tiles/flood_extent/{z}/{x}/{y}.png?colormap=${FLOOD_CMAP}`],
+        tiles: [withBase(`/tiles/flood_extent/{z}/{x}/{y}.png?colormap=${FLOOD_CMAP}`)],
         tileSize: 256,
       },
       sus: {
         type: "raster",
-        tiles: [`/tiles/susceptibility/{z}/{x}/{y}.png?colormap=${SUS_CMAP}`],
+        tiles: [withBase(`/tiles/susceptibility/{z}/{x}/{y}.png?colormap=${SUS_CMAP}`)],
         tileSize: 256,
       },
-      muni: { type: "geojson", data: "/api/municipalities" },
+      muni: { type: "geojson", data: EMPTY_FC },
     },
     layers: [
       { id: "osm", type: "raster", source: "osm" },
@@ -136,7 +153,7 @@ function styleFor(vis: Vis, mode: "risk" | "before" | "after"): maplibregl.Style
   if (mode !== "risk") {
     (s.sources as any).sar = {
       type: "raster",
-      tiles: [`/tiles/${mode === "before" ? "sar_before" : "sar_after"}/{z}/{x}/{y}.png?${GRAY}`],
+      tiles: [withBase(`/tiles/${mode === "before" ? "sar_before" : "sar_after"}/{z}/{x}/{y}.png?${GRAY}`)],
       tileSize: 256,
     };
     // sar sits above osm, below the vector overlays
@@ -159,6 +176,7 @@ export default function App() {
   const [layers, setLayers] = useState<Vis>({ flood: false, sus: false, muni: true });
   const layersRef = useRef(layers);
   const selCodeRef = useRef(selCode);
+  const muniFc = useRef<any>(null); // full FeatureCollection for maplibre sources
   const [compare, setCompare] = useState(false);
   const [split, setSplit] = useState(50);
   const [step, setStep] = useState<number | null>(0);
@@ -209,18 +227,26 @@ export default function App() {
   useEffect(() => {
     const m = new maplibregl.Map({
       container: mapRef.current!,
-      style: { version: 8, sources: {}, layers: [] } as any,
+      // full style up front — starting empty + setStyle on "load" rebuilt the
+      // style forever (load refires after each rebuild, discarding sources
+      // mid-fetch: choropleth flickered, toggles never stuck)
+      style: styleFor(layersRef.current, "risk"),
       center: CENTER,
       zoom: 9,
       attributionControl: false,
     });
-    m.on("load", () => m.setStyle(styleFor(layersRef.current, "risk")));
+    (window as any).__map = m; // dev/e2e hook: inspect style state in tests
     map.current = m;
 
     // re-apply toggles whenever a (re)loaded style finishes — the old effect
     // skipped silently while isStyleLoaded() was false and flood stayed hidden
     m.on("styledata", () => {
       applyVis(m, layersRef.current);
+      const src = m.getSource("muni") as maplibregl.GeoJSONSource | undefined;
+      if (muniFc.current && src && !fedSources.has(src)) {
+        src.setData(muniFc.current);
+        fedSources.add(src);
+      }
       if (m.getLayer("muni-sel"))
         m.setFilter("muni-sel", ["==", ["get", "code"], selCodeRef.current ?? "__none__"] as any);
     });
@@ -239,9 +265,20 @@ export default function App() {
     });
     m.on("zoom", () => setZoom(m.getZoom()));
 
-    fetch("/api/municipalities")
+    fetch(withBase("/api/municipalities"))
       .then((r) => (r.ok ? r.json() : null))
-      .then((d) => d && setMunis(d.features ?? []))
+      .then((d) => {
+        if (!d) return;
+        setMunis(d.features ?? []);
+        muniFc.current = d;
+        for (const mm of [map.current, beforeMap.current]) {
+          const src = mm?.getSource("muni") as maplibregl.GeoJSONSource | undefined;
+          if (src && !fedSources.has(src)) {
+            src.setData(d);
+            fedSources.add(src);
+          }
+        }
+      })
       .catch(() => {});
     return () => {
       cancelAnimationFrame(coordRaf);
@@ -250,22 +287,22 @@ export default function App() {
   }, []);
 
   // compare mode: second map (SAR recessão) under the clipped "pico" view
+  const comparePrev = useRef(false);
   useEffect(() => {
     const m = map.current;
-    if (!m) return;
+    if (!m || compare === comparePrev.current) return; // skip the mount pass —
+    comparePrev.current = compare; // constructor style already matches "risk"
     m.setStyle(styleFor(layersRef.current, compare ? "after" : "risk"));
     if (!compare || !beforeRef.current) return;
     const m2 = new maplibregl.Map({
       container: beforeRef.current,
-      style: { version: 8, sources: {}, layers: [] } as any,
+      style: styleFor(layersRef.current, "before"),
       center: m.getCenter(),
       zoom: m.getZoom(),
       attributionControl: false,
     });
-    m2.on("load", () => {
-      m2.setStyle(styleFor(layersRef.current, "before"));
-      attachCursors(m2);
-    });
+    (window as any).__map2 = m2; // dev/e2e hook
+    m2.on("load", () => attachCursors(m2));
     m2.on("styledata", () => {
       applyVis(m2, layersRef.current);
       if (m2.getLayer("muni-sel"))
@@ -300,7 +337,7 @@ export default function App() {
   // rio-tiler health probe for the header status pill
   useEffect(() => {
     const t0 = performance.now();
-    fetch("/api/layers")
+    fetch(withBase("/api/layers"))
       .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
       .then(() => {
         setTiler("online");
@@ -311,7 +348,7 @@ export default function App() {
 
   // flood-polygon export is only enabled when the layer was actually built
   useEffect(() => {
-    fetch("/api/flood_polygons", { method: "HEAD" })
+    fetch(withBase("/api/flood_polygons"), { method: "HEAD" })
       .then((r) => setFloodOk(r.ok))
       .catch(() => setFloodOk(false));
   }, []);
@@ -329,7 +366,7 @@ export default function App() {
   useEffect(() => {
     if (!sel?.code) return setPlan(null);
     let alive = true;
-    fetch(`/api/plan/${sel.code}`)
+    fetch(withBase(`/api/plan/${sel.code}`))
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => alive && setPlan(d))
       .catch(() => {});

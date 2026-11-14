@@ -1,6 +1,7 @@
 """Precipitation + soil-moisture features from Open-Meteo (no auth required)."""
 
 import logging
+import time
 from pathlib import Path
 
 import httpx
@@ -13,6 +14,11 @@ CACHE = Path(__file__).resolve().parents[2] / "data" / "meteo"
 
 
 def fetch_open_meteo(lat: float, lon: float, start: str, end: str, timeout: float = 60.0) -> dict:
+    """Fetch with 429/5xx retry (shared egress IPs get throttled often).
+
+    Raises RuntimeError after 3 attempts — callers already decide the
+    fallback; a non-200 body must never be silently parsed as empty series.
+    """
     params = {
         "latitude": lat,
         "longitude": lon,
@@ -22,7 +28,20 @@ def fetch_open_meteo(lat: float, lon: float, start: str, end: str, timeout: floa
         "hourly": "soil_moisture_0_to_7cm",
         "timezone": "America/Sao_Paulo",
     }
-    return httpx.get(ARCHIVE_URL, params=params, timeout=timeout).json()
+    r = None
+    for attempt in range(3):
+        r = httpx.get(ARCHIVE_URL, params=params, timeout=timeout)
+        if r.status_code == 200:
+            return r.json()
+        wait = int(r.headers.get("Retry-After") or 0) or 10 * (attempt + 1)
+        if r.status_code == 429 and wait > 600:
+            # hard per-IP block (hours) — retrying this run is pointless,
+            # go straight to the caller's fallback
+            raise RuntimeError(f"open-meteo hard rate limit: retry after {wait}s")
+        logger.warning("open-meteo %s (attempt %d/3), waiting %ss", r.status_code, attempt + 1, wait)
+        if attempt < 2:
+            time.sleep(min(wait, 45))
+    raise RuntimeError(f"open-meteo unavailable after 3 attempts (last HTTP {r.status_code})")
 
 
 def _series(payload: dict, block: str, var: str) -> list:

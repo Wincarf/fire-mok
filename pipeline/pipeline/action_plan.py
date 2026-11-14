@@ -7,15 +7,26 @@ Portuguese strings — these reach the UI and the manager-facing report.
 SEVERITY_ORDER = ["low", "moderate", "high", "critical"]
 
 
+def _num(m: dict, key: str, default: float = 0.0) -> float:
+    """GeoJSON round-trips turn NaN/None into strings or null — coerce to a
+    finite number so the rule comparisons never crash on unknown values."""
+    try:
+        x = float(m.get(key, default))
+    except (TypeError, ValueError):
+        return default
+    return default if x != x else x  # nan != nan
+
+
 def build_action_plan(m: dict) -> dict:
     cat = m.get("risk_category", "low")
     actions: list[str] = []
     reasons: list[str] = []
+    pop_exposed = int(_num(m, "pop_exposed"))
 
     if cat in ("high", "critical"):
         reasons.append(f"categoria de risco {cat}")
         actions += [
-            f"Mobilizar abrigos para ~{m.get('pop_exposed', 0):,}".replace(",", ".") + " pessoas potencialmente expostas",
+            f"Mobilizar abrigos para ~{pop_exposed:,}".replace(",", ".") + " pessoas potencialmente expostas",
             "Pré-posicionar equipes de resgate e embarcações nas áreas de várzea",
             "Emitir aviso preventivo à população das áreas ribeirinhas",
         ]
@@ -31,23 +42,28 @@ def build_action_plan(m: dict) -> dict:
             "Atualizar cadastro de áreas de risco no plano diretor",
         ]
 
-    if m.get("flood_frac", 0) > 0.02:
-        reasons.append(f"{100*m['flood_frac']:.1f}% da área municipal com inundação observada")
+    flood_frac = _num(m, "flood_frac")
+    if flood_frac > 0.02:
+        reasons.append(f"{100*flood_frac:.1f}% da área municipal com inundação observada")
         actions.append("Priorizar vistorias e desobstrução nos setores com água observada no SAR")
-    if m.get("precip_max7d_mm", 0) > 250:
-        reasons.append(f"{m['precip_max7d_mm']:.0f} mm em 7 dias")
+    precip_max7d = _num(m, "precip_max7d_mm")
+    if precip_max7d > 250:
+        reasons.append(f"{precip_max7d:.0f} mm em 7 dias")
         actions.append("Monitorar níveis dos rios e reforçar aviso em caso de nova chuva intensa")
-    if (m.get("precip_forecast_max7d_mm", 0) or 0) > 100:
-        reasons.append(f"previsão de {m['precip_forecast_max7d_mm']:.0f} mm nos próximos 7 dias")
+    precip_fc = _num(m, "precip_forecast_max7d_mm")
+    if precip_fc > 100:
+        reasons.append(f"previsão de {precip_fc:.0f} mm nos próximos 7 dias")
         actions.append("Preparar alerta preventivo para a próxima semana — chuva prevista sobre solo já carregado")
-    if m.get("soil_moisture_mean", 0) > 0.4:
+    soil = _num(m, "soil_moisture_mean")
+    if soil > 0.4:
         reasons.append("solo próximo da saturação")
         actions.append("Atenção a encostas e áreas de infiltração — solo saturado reduz escoamento")
-    if m.get("sus_frac", 0) > 0.5:
-        reasons.append(f"{100*m['sus_frac']:.0f}% do território em terreno baixo e plano")
+    sus_frac = _num(m, "sus_frac")
+    if sus_frac > 0.5:
+        reasons.append(f"{100*sus_frac:.0f}% do território em terreno baixo e plano")
         actions.append("Revisar rotas de fuga e pontos de encontro em áreas de várzea")
-    if m.get("pop_exposed", 0) > 10_000:
-        reasons.append(f"~{m['pop_exposed']:,} pessoas na área potencialmente afetada".replace(",", "."))
+    if pop_exposed > 10_000:
+        reasons.append(f"~{pop_exposed:,} pessoas na área potencialmente afetada".replace(",", "."))
         actions.append("Acionar plano de contingência intermunicipal/regional")
 
     return {
