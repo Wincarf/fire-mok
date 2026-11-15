@@ -127,3 +127,61 @@ def gcov_to_cog(h5_path: Path, pol: str = "HHHH", out: Path | None = None) -> Pa
     ) as dst:
         dst.write(db.astype("float32"), 1)
     return out
+
+
+def summarize_lband_db(values: np.ndarray) -> dict:
+    """Open-water proxy stats from L-band GCOV dB over valid pixels.
+
+    Open water drops L-band σ0 well below the surrounding land mean (no
+    volume scattering, specular return), so the fraction of pixels below
+    mean − 1.5σ is used as a proxy indicator — it is NOT a classified
+    flood map; permanent-water removal needs the WorldCover context.
+    """
+    v = np.asarray(values, dtype="float32")
+    v = v[np.isfinite(v)]
+    if v.size == 0:
+        return {"pixels": 0}
+    mean = float(v.mean())
+    std = float(v.std())
+    return {
+        "pixels": int(v.size),
+        "mean_db": round(mean, 2),
+        "p05_db": round(float(np.percentile(v, 5)), 2),
+        "std_db": round(std, 2),
+        "low_backscatter_fraction": round(float((v < mean - 1.5 * std).mean()), 4),
+    }
+
+
+def lband_stats_over_bbox(cog_path: Path, bbox: tuple[float, float, float, float]) -> dict:
+    """Read the GCOV dB COG inside a lon/lat bbox and summarize it."""
+    from rasterio.warp import transform_bounds
+    from rasterio.windows import Window, from_bounds
+
+    with rasterio.open(cog_path) as src:
+        left, bottom, right, top = transform_bounds(
+            "EPSG:4326", src.crs, *bbox, densify_pts=21
+        )
+        win = from_bounds(left, bottom, right, top, transform=src.transform)
+        win = win.intersection(Window(0, 0, src.width, src.height))
+        if win.width <= 0 or win.height <= 0:
+            return {"pixels": 0}
+        data = src.read(1, window=win)
+    return summarize_lband_db(data)
+
+
+def inventory_payload(
+    scenes: list[Scene],
+    aoi_name: str,
+    bbox: tuple[float, float, float, float],
+    generated: str,
+) -> dict:
+    """Public (no Earthdata auth) GCOV scene inventory, served at /api/nisar."""
+    return {
+        "product": "NISAR L2 GCOV (PROVISIONAL / BETA) — ASF DAAC",
+        "mission": "NISAR (NASA–ISRO)",
+        "aoi": aoi_name,
+        "bbox": list(bbox),
+        "generated": generated,
+        "count": len(scenes),
+        "scenes": [{"id": s.id, "datetime": s.datetime, "url": s.url} for s in scenes],
+    }

@@ -8,7 +8,7 @@
 
 Plataforma de monitoreo de inundaciones para Río Grande del Sur, Brasil.
 Caso ancla: la inundación de mayo de 2024 en la cuenca del Guaíba —
-detectada en SAR Sentinel-1 (lista para NISAR), cruzada con territorio
+detectada en SAR Sentinel-1 (con NISAR GCOV integrado), cruzada con territorio
 (IBGE), clima (Open-Meteo + NASA POWER), terreno (Copernicus DEM + HAND)
 y población (WorldPop) en un índice de riesgo municipal con un plan de
 acción rastreable hasta los datos.
@@ -78,16 +78,21 @@ Solo fuentes públicas — sin credenciales de Earthdata.
   observada en los últimos 7 días y el **pronóstico** Open-Meteo de los
   próximos 7 días.
 
-## NISAR (banda de validación de la misión)
+## NISAR (NASA–ISRO, banda L) — integrado
 
-`pipeline/scripts/validate_nisar.py` descarga una escena NISAR GCOV vía
-ASF DAAC y convierte HDF5 -> COG.
+NISAR está integrado en el pipeline de monitoreo (`pipeline/scripts/build_nisar.py`):
 
-- Requiere `EARTHDATA_USERNAME`/`EARTHDATA_PASSWORD`; sin credenciales el
-  script registra `skipped: no Earthdata creds` y termina con éxito.
-- NISAR (banda L) y Sentinel-1 (banda C) viven en **capas separadas** — no
-  comparables por diferencia.
+- **Siempre**: búsqueda ASF anónima sobre el AOI → inventario público de
+  escenas en `/api/nisar` (60 escenas GCOV sobre el AOI Guaíba en el último
+  año; corre a diario en CI).
+- **Con una cuenta Earthdata gratuita** (`EARTHDATA_USER`/`EARTHDATA_PASS`
+  o netrc): descarga el gránulo GCOV más reciente, convierte HDF5 → COG
+  (dB) y publica el proxy de agua abierta banda L en los planes de acción
+  (bloque `nisar` en `/api/plan/{code}`). Sin credenciales, el script
+  registra `inventory-only` y termina con éxito.
 
+NISAR (banda L) y Sentinel-1 (banda C) viven en **capas separadas** — no
+comparables por diferencia.
 ## Validación
 
 - Extensión SAR validada contra Sentinel-2 NDWI (máscara SCL) en **chips

@@ -8,7 +8,7 @@
 
 面向巴西南里奥格兰德州（Rio Grande do Sul）的洪水监测平台。
 锚定案例：2024 年 5 月瓜伊巴（Guaíba）流域洪水——基于 Sentinel-1 SAR
-检测（已为 NISAR 做好准备），融合行政区域（IBGE）、气象
+检测（已集成 NISAR GCOV），融合行政区域（IBGE）、气象
 （Open-Meteo + NASA POWER）、地形（Copernicus DEM + HAND）与人口
 （WorldPop）数据，生成市级风险指数及可溯源到数据的行动计划。
 
@@ -73,16 +73,19 @@ docker build -t fire-mok . && docker run -p 8000:8000 -v "$PWD/data:/app/data" f
 - 前瞻式降雨：风险指数取**两者较大值**——过去 7 天的实测降雨与
   Open-Meteo 未来 7 天的**预报**降雨。
 
-## NISAR（任务验证波段）
+## NISAR（NASA–ISRO，L 波段）— 已集成
 
-`pipeline/scripts/validate_nisar.py` 通过 ASF DAAC 下载 NISAR GCOV
-影像，并将 HDF5 转换为 COG。
+NISAR 已接入监测流水线（`pipeline/scripts/build_nisar.py`）：
 
-- 需要 `EARTHDATA_USERNAME`/`EARTHDATA_PASSWORD`；无凭据时脚本会记录
-  `skipped: no Earthdata creds` 并正常退出。
-- NISAR（L 波段）与 Sentinel-1（C 波段）分别保存在**不同图层**——
-  不可通过差值进行比较。
+- **始终**：对 AOI 进行匿名 ASF 搜索 → `/api/nisar` 公开场景目录（过去一年
+  Guaíba AOI 上空有 60 景 GCOV；CI 每日运行）。
+- **使用免费 Earthdata 登录后**（`EARTHDATA_USER`/`EARTHDATA_PASS` 或
+  netrc）：下载最新的 GCOV 分块，转换 HDF5 → COG（dB），并在每个行动计划中
+  发布 L 波段开阔水域代理指标（`/api/plan/{code}` 的 `nisar` 块）。没有凭据
+  时脚本记录 `inventory-only` 并正常退出。
 
+NISAR（L 波段）与 Sentinel-1（C 波段）分别保存在**不同图层**——
+不可用差值法对比。
 ## 验证
 
 - SAR 淹没范围与 Sentinel-2 NDWI（经 SCL 掩膜）在**分层抽样切片**上

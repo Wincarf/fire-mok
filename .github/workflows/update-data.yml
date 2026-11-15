@@ -33,11 +33,20 @@ jobs:
       - run: |
           uv run python scripts/update_latest.py \
             --lookback-days "${{ github.event.inputs.lookback_days || 14 }}"
+      # NISAR (NASA–ISRO): public GCOV inventory always; L-band product once
+      # EARTHDATA_USER/EARTHDATA_PASS secrets are set (free account).
+      - run: uv run python scripts/build_nisar.py
+        env:
+          EARTHDATA_USER: ${{ secrets.EARTHDATA_USER }}
+          EARTHDATA_PASS: ${{ secrets.EARTHDATA_PASS }}
       - uses: actions/upload-artifact@v4
         with:
           name: flood-extent-latest
           path: |
             data/sar/flood_extent_latest.tif
             data/vector/flood_polygons_latest.geojson
+            data/vector/nisar_scenes.json
+            data/vector/nisar_status.json
+            data/nisar/
           if-no-files-found: ignore
           retention-days: 7

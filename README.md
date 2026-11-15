@@ -8,7 +8,7 @@
 
 Flood monitoring platform for Rio Grande do Sul, Brazil. Anchor case: the
 May 2024 flood in the Guaíba basin — detected in Sentinel-1 SAR
-(NISAR-ready), crossed with territory (IBGE), weather (Open-Meteo + NASA
+(NISAR GCOV integrated), crossed with territory (IBGE), weather (Open-Meteo + NASA
 POWER), terrain (Copernicus DEM + HAND) and population (WorldPop) into a
 municipal risk index with an action plan traceable to the data.
 
@@ -74,16 +74,21 @@ Public sources only — no Earthdata credentials needed.
 - Forward-looking rain: the risk index uses the **larger** of the last 7
   days' observed rain and the 7-day Open-Meteo **forecast**.
 
-## NISAR (mission validation band)
+## NISAR (NASA–ISRO, L-band) — integrated
 
-`pipeline/scripts/validate_nisar.py` downloads a NISAR GCOV scene via ASF
-DAAC and converts HDF5 -> COG.
+NISAR is wired into the monitoring pipeline (`pipeline/scripts/build_nisar.py`):
 
-- Requires `EARTHDATA_USERNAME`/`EARTHDATA_PASSWORD`; without credentials
-  the script logs `skipped: no Earthdata creds` and exits successfully.
-- NISAR (L-band) and Sentinel-1 (C-band) live in **separate layers** — not
-  comparable by difference.
+- **Always**: anonymous ASF search over the AOI → public scene inventory at
+  `/api/nisar` (60 GCOV scenes over the Guaíba AOI in the last year; runs
+  daily in CI).
+- **With a free Earthdata login** (`EARTHDATA_USER`/`EARTHDATA_PASS` or
+  netrc): downloads the newest GCOV granule, converts HDF5 → COG (dB) and
+  publishes the L-band open-water proxy stats on every action plan
+  (`nisar` block in `/api/plan/{code}`). Without credentials the script
+  logs `inventory-only` and exits successfully.
 
+NISAR (L-band) and Sentinel-1 (C-band) live in **separate layers** — not
+comparable by difference.
 ## Validation
 
 - SAR extent validated against Sentinel-2 NDWI (SCL-masked) on **stratified
