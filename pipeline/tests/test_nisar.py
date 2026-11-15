@@ -8,6 +8,7 @@ import rasterio
 from pipeline.nisar import (
     _gcov_dataset_path,
     duet_diff,
+    duet_products,
     earthdata_session,
     inventory_payload,
     lband_stats_over_bbox,

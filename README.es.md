@@ -126,7 +126,7 @@ comparables por diferencia.
 - Los falsos positivos documentados (urbano, agua permanente) se
   **recortan de la extensión** con ESA WorldCover 10 m (clases built-up y
   permanent water).
-- `cd pipeline && uv run pytest tests/` — 94 tests; `api/tests/` 12;
+- `cd pipeline && uv run pytest tests/` — 95 tests; `api/tests/` 12;
   `web/` 20 (vitest). CI ejecuta los tres en GitHub Actions.
 
 ## Licencia

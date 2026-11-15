@@ -128,7 +128,7 @@ séparées** — non comparables par différence.
 - Les faux positifs documentés (urbain, eau permanente) sont **retirés de
   l'emprise** avec ESA WorldCover 10 m (classes built-up et permanent
   water).
-- `cd pipeline && uv run pytest tests/` — 94 tests ; `api/tests/` 12 ;
+- `cd pipeline && uv run pytest tests/` — 95 tests ; `api/tests/` 12 ;
   `web/` 20 (vitest). La CI exécute les trois sur GitHub Actions.
 
 ## Licence

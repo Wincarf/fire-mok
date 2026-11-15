@@ -112,7 +112,7 @@ NISAR（L 波段）与 Sentinel-1（C 波段）分别保存在**不同图层**�
   切片最高达 79%——已由分类别指标 + 置信区间的新报告取代。
 - 已记录的假阳性（城市地表、永久水体）通过 ESA WorldCover 10 m
   （built-up 与 permanent water 类别）**从淹没范围中剔除**。
-- `cd pipeline && uv run pytest tests/` — 94 个测试；`api/tests/` 12 个；
+- `cd pipeline && uv run pytest tests/` — 95 个测试；`api/tests/` 12 个；
   `web/` 20 个（vitest）。CI 在 GitHub Actions 上运行全部三套。
 
 ## 许可证

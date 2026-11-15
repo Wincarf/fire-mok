@@ -124,7 +124,7 @@ NISAR (L-диапазон) и Sentinel-1 (C-диапазон) хранятся �
 - Задокументированные ложные срабатывания (застройка, постоянные водоёмы)
   **вырезаются из контура** с помощью ESA WorldCover 10 м (классы
   built-up и permanent water).
-- `cd pipeline && uv run pytest tests/` — 94 теста; `api/tests/` — 12;
+- `cd pipeline && uv run pytest tests/` — 95 теста; `api/tests/` — 12;
   `web/` — 20 (vitest). CI запускает все три в GitHub Actions.
 
 ## Лицензия

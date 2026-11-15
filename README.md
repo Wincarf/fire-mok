@@ -116,7 +116,7 @@ comparable by difference.
   79% on real-flood chips — superseded by the per-class + CI report.
 - Documented false positives (urban, permanent water) are **cut from the
   extent** with ESA WorldCover 10 m (built-up, permanent water classes).
-- `cd pipeline && uv run pytest tests/` — 94 tests; `api/tests/` 12;
+- `cd pipeline && uv run pytest tests/` — 95 tests; `api/tests/` 12;
   `web/` 20 (vitest). CI runs all three on GitHub Actions.
 
 ## License
