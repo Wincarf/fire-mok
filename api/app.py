@@ -21,6 +21,12 @@ LAYERS = {
     "susceptibility": "terrain/susceptibility_guaiba.tif",
     "hand": "terrain/hand_guaiba.tif",
     "dem": "terrain/cop_dem_glo30_guaiba.tif",
+    "choreo_peak": "sar/choreo_extent_20240511.tif",
+    "choreo_recession": "sar/choreo_extent_20240530.tif",
+    "choreo_calm": "sar/choreo_extent_20240604.tif",
+    "nisar_hh": "nisar/nisar_hh_db.tif",
+    "nisar_lwater": "nisar/nisar_lwater.tif",
+    "nisar_diff": "nisar/nisar_diff.tif",
 }
 
 
@@ -108,6 +114,20 @@ def create_app(data_dir: Path | None = None) -> FastAPI:
         p = data / "vector" / "nisar_scenes.json"
         if not p.exists():
             raise HTTPException(404, "nisar inventory not built")
+        return json.loads(p.read_text(encoding="utf-8"))
+
+    @app.get("/api/choreo")
+    def choreo():
+        p = data / "vector" / "choreo.json"
+        if not p.exists():
+            raise HTTPException(404, "choreography not built")
+        return json.loads(p.read_text(encoding="utf-8"))
+
+    @app.get("/api/nisar_product")
+    def nisar_product():
+        p = data / "vector" / "nisar_status.json"
+        if not p.exists():
+            raise HTTPException(404, "nisar product not built")
         return json.loads(p.read_text(encoding="utf-8"))
 
     @app.api_route("/api/flood_polygons", methods=["GET", "HEAD"])  # HEAD: web usa para habilitar export

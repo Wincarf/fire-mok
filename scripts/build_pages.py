@@ -28,10 +28,28 @@ TILE_LAYERS = {
     "sar_after": ("sar/S1A_IW_GRDH_1SDV_20240511T084943_20240511T085008_053821_068A6E_rtc_vv_db.tif", "rescale=-30,0"),
     "flood_extent": ("sar/flood_extent_may2024.tif", None),
     "susceptibility": ("terrain/susceptibility_guaiba.tif", None),
+    "choreo_peak": ("sar/choreo_extent_20240511.tif", None),
+    "choreo_recession": ("sar/choreo_extent_20240530.tif", None),
+    "choreo_calm": ("sar/choreo_extent_20240604.tif", None),
+    "nisar_hh": ("nisar/nisar_hh_db.tif", "rescale=-30,0"),
+    "nisar_lwater": ("nisar/nisar_lwater.tif", None),
+    "nisar_diff": ("nisar/nisar_diff.tif", None),
 }
 # web/src/App.tsx colormaps (URL-encoded JSON on the live API; baked into files here)
 FLOOD_CMAP = {0: (0, 0, 0, 0), 1: (220, 38, 38, 200)}
 SUS_CMAP = {0: (0, 0, 0, 0), 1: (37, 99, 235, 140)}
+CHOREO_CMAP = {0: (0, 0, 0, 0), 1: (37, 99, 235, 150)}
+NISAR_WATER_CMAP = {0: (0, 0, 0, 0), 1: (34, 211, 238, 170)}
+DIFF_CMAP = {0: (0, 0, 0, 0), 1: (220, 38, 38, 160), 2: (34, 211, 238, 190)}
+CMAPS = {
+    "flood_extent": FLOOD_CMAP,
+    "susceptibility": SUS_CMAP,
+    "choreo_peak": CHOREO_CMAP,
+    "choreo_recession": CHOREO_CMAP,
+    "choreo_calm": CHOREO_CMAP,
+    "nisar_lwater": NISAR_WATER_CMAP,
+    "nisar_diff": DIFF_CMAP,
+}
 AOI_BBOX = (-51.6, -30.4, -50.7, -29.7)  # pipeline/aoi.py "guaiba"
 Z_RANGE = range(6, 13)  # app opens at z9; z12 is plenty for a demo
 
@@ -42,7 +60,7 @@ def render_layer(name: str, rel: str, special: str | None, out_dir: Path, data: 
     if not path.exists():
         print(f"  [skip] {name}: {rel} missing")
         return 0
-    cmap = FLOOD_CMAP if name == "flood_extent" else SUS_CMAP if name == "susceptibility" else None
+    cmap = CMAPS.get(name)
     n = 0
     with COGReader(str(path)) as cog:
         # clamp the tile sweep to AOI ∩ data bounds (scene footprints can be
@@ -160,6 +178,14 @@ def main() -> int:
     if nisar_inv.exists():
         shutil.copyfile(nisar_inv, api / "nisar")
         print("  api/nisar: inventory")
+    choreo_p = args.data / "vector" / "choreo.json"
+    if choreo_p.exists():
+        shutil.copyfile(choreo_p, api / "choreo")
+        print("  api/choreo: dance beats")
+    nisar_prod = args.data / "vector" / "nisar_status.json"
+    if nisar_prod.exists():
+        shutil.copyfile(nisar_prod, api / "nisar_product")
+        print("  api/nisar_product: L-band status")
 
     # 3) pre-rendered tiles
     total = 0
