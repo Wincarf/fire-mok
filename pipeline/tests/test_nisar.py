@@ -41,9 +41,10 @@ def test_lband_stats_over_bbox_reads_window(tmp_path):
     ) as dst:
         dst.write(arr, 1)
 
-    s = lband_stats_over_bbox(tif, (-50.9, -29.9, -50.1, -29.1))
+    s = lband_stats_over_bbox(tif, (-51.0, -30.0, -50.0, -29.0))  # full raster extent
     assert s["pixels"] == 100
     assert s["mean_db"] < -14
+    assert s["low_backscatter_fraction"] > 0.02  # 4 water pixels of 100
 
 
 def test_inventory_payload_shape():
