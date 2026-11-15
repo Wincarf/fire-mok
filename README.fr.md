@@ -32,6 +32,26 @@ pré-rendues z6–12).
   --out ../pages_site --data ../data` (les données dans `data/` doivent
   exister).
 
+## La Danse et la carte du lundi (nouveau)
+
+- **La Danse** — trois temps réels de Sentinel-1 sur l'inondation de mai
+  2024, dans un curseur temporel avec lecture automatique : **pic 11/mai
+  (203,7 km², ~70,8 milliers de personnes exposées) → décrue 30/mai
+  (47,6 km²) → calme 4/juin (0 km²)**. Générée par
+  `pipeline/scripts/build_choreo.py` (lectures RTC de Planetary Computer
+  sur une grille commune, nettoyage WorldCover, exposition aréale par
+  municipalité).
+- **Carte du lundi** — un clic transforme le temps choisi en une alerte en
+  portugais prête pour WhatsApp (copier-coller). Chaque ligne s'appuie sur
+  des données réelles ; les lignes sans source (p. ex. écoles/hôpitaux OSM
+  quand Overpass est inaccessible) sont simplement omises — jamais
+  inventées.
+- **Duet NISAR** — le mode partagé C×L et trois couches bande L sont déjà
+  intégrés et s'activent seuls dès que le premier produit bande L existe
+  (compte Earthdata gratuit → secrets du dépôt → lancer *monitoring
+  update*).
+- Nouveaux endpoints : `/api/choreo` et `/api/nisar_product`.
+
 ## Architecture
 
 ```
@@ -108,7 +128,7 @@ séparées** — non comparables par différence.
 - Les faux positifs documentés (urbain, eau permanente) sont **retirés de
   l'emprise** avec ESA WorldCover 10 m (classes built-up et permanent
   water).
-- `cd pipeline && uv run pytest tests/` — 87 tests ; `api/tests/` 9 ;
+- `cd pipeline && uv run pytest tests/` — 93 tests ; `api/tests/` 12 ;
   `web/` 20 (vitest). La CI exécute les trois sur GitHub Actions.
 
 ## Licence

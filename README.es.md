@@ -31,6 +31,25 @@ pregeneradas z6–12).
   `cd pipeline && uv run python ../scripts/build_pages.py --dist ../web/dist
   --out ../pages_site --data ../data` (los datos en `data/` deben existir).
 
+## La Danza y la tarjeta del lunes (nuevo)
+
+- **La Danza** — tres latidos reales de Sentinel-1 sobre la inundación de
+  mayo de 2024, en un deslizador temporal con reproducción: **pico 11/may
+  (203,7 km², ~70,8 mil personas expuestas) → recesión 30/may (47,6 km²)
+  → calma 4/jun (0 km²)**. Generada por `pipeline/scripts/build_choreo.py`
+  (lecturas RTC de Planetary Computer en una rejilla común, limpieza
+  WorldCover, exposición areal por municipio).
+- **Tarjeta del lunes** — un clic convierte el latido elegido en una
+  alerta en portugués lista para WhatsApp (copiar y pegar). Cada línea
+  proviene de datos reales; las líneas sin fuente (p. ej., escuelas y
+  hospitales de OSM cuando Overpass no está accesible) simplemente se
+  omiten — nunca se inventan.
+- **Duet NISAR** — el modo dividido C×L y tres capas de banda L ya están
+  en la app y aparecen solos cuando exista el primer producto banda L
+  (cuenta Earthdata gratuita → secrets del repositorio → ejecutar
+  *monitoring update*).
+- Nuevos endpoints: `/api/choreo` y `/api/nisar_product`.
+
 ## Arquitectura
 
 ```
@@ -107,7 +126,7 @@ comparables por diferencia.
 - Los falsos positivos documentados (urbano, agua permanente) se
   **recortan de la extensión** con ESA WorldCover 10 m (clases built-up y
   permanent water).
-- `cd pipeline && uv run pytest tests/` — 87 tests; `api/tests/` 9;
+- `cd pipeline && uv run pytest tests/` — 93 tests; `api/tests/` 12;
   `web/` 20 (vitest). CI ejecuta los tres en GitHub Actions.
 
 ## Licencia

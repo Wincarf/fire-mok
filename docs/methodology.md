@@ -58,6 +58,22 @@ areas still flooded on Jun 04, and it is mitigated by requiring a valid
   layers (`permanent_water`, `urban`). A WorldCover download failure never
   blocks the build (the mask is context).
 
+### Flood choreography ("the Dance") and the Monday card
+
+The choreography replays the May-2024 event on real acquisitions. All beats
+are differenced against the June 4, 2024 recession scene (the same
+descending pass as the May 11 peak — the pipeline's standard dry baseline):
+σ0 < −15 dB, ESA WorldCover permanent-water and urban classes removed,
+connected blobs under ~1 ha dropped. The archive holds no pre-flood scene
+on this pass, so the dance opens in medias res at the peak — May 11
+(203.69 km²) — then May 30 (47.57 km², a different track, noted in the
+metadata) and June 4 (0 km², the baseline itself). Municipal exposure per
+beat is areal interpolation: municipality population × (flooded area ÷
+municipality area), labelled as an estimate. The Monday-morning card is a
+direct rendering of one beat of `choreo.json` — every line traces to that
+JSON; optional facility counts (schools, hospitals/clinics from OSM
+Overpass) appear only when the service is reachable.
+
 ## 4. Validation (Sentinel-2 NDWI, stratified chips over the AOI)
 
 References: S2 L2A scenes from May 2024 with cloud cover < 40%, **ranked by

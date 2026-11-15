@@ -29,6 +29,22 @@ endpoints are mirrored as files (`/api/municipalities`, `/api/layers`,
   `cd pipeline && uv run python ../scripts/build_pages.py --dist ../web/dist
   --out ../pages_site --data ../data` (data in `data/` must exist).
 
+## The Dance & the Monday card (new)
+
+- **The Dance** — three real Sentinel-1 beats over the May-2024 flood, in a
+  time slider with a play loop: **May 11 peak (203.7 km², ~70.8k people
+  exposed) → May 30 recession (47.6 km²) → Jun 4 calm (0 km²)**. Built by
+  `pipeline/scripts/build_choreo.py` (windowed PC RTC reads on a common
+  grid, WorldCover cleaning, per-municipality areal exposure).
+- **Monday card** — one click turns the selected beat into a pt-BR,
+  WhatsApp-ready alert card (copy & paste). Every line is backed by real
+  data; lines with no source (e.g. OSM schools/hospitals when Overpass is
+  unreachable) are simply omitted — never mocked.
+- **NISAR duet** — a C×L split mode and three L-band layers are wired into
+  the UI and unlock automatically once the first L-band product exists
+  (free Earthdata login → repo secrets → run *monitoring update*).
+- New endpoints: `/api/choreo` and `/api/nisar_product`.
+
 ## Architecture
 
 ```
@@ -100,7 +116,7 @@ comparable by difference.
   79% on real-flood chips — superseded by the per-class + CI report.
 - Documented false positives (urban, permanent water) are **cut from the
   extent** with ESA WorldCover 10 m (built-up, permanent water classes).
-- `cd pipeline && uv run pytest tests/` — 87 tests; `api/tests/` 9;
+- `cd pipeline && uv run pytest tests/` — 93 tests; `api/tests/` 12;
   `web/` 20 (vitest). CI runs all three on GitHub Actions.
 
 ## License

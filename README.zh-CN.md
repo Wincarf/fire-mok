@@ -28,6 +28,21 @@
   `cd pipeline && uv run python ../scripts/build_pages.py --dist ../web/dist
   --out ../pages_site --data ../data`（需要 `data/` 中的数据）。
 
+## 洪水之舞与周一晨报卡片（新功能）
+
+- **洪水之舞（The Dance）** — 哨兵-1号在 2024 年 5 月洪水期间的三个真实时相，
+  带时间滑块和自动播放：**5 月 11 日峰值（203.7 km²，约 7.08 万人暴露）→
+  5 月 30 日消退（47.6 km²）→ 6 月 4 日平静（0 km²）**。由
+  `pipeline/scripts/build_choreo.py` 生成（Planetary Computer RTC 窗口化
+  读取、公共网格、WorldCover 清理、按市镇的面积插值人口暴露）。
+- **周一晨报卡片** — 一键将所选时相转为葡萄牙语、可直接粘贴到 WhatsApp 的
+  通报卡片。每行都来自真实数据；没有数据源的行（例如 Overpass 不可达时的
+  学校/医院统计）会直接省略 — 绝不编造。
+- **NISAR 二重奏** — C×L 分屏模式与三个 L 波段图层已接入界面，一旦首个
+  L 波段产品生成即自动解锁（免费 Earthdata 账号 → 仓库 secrets → 运行
+  *monitoring update*）。
+- 新端点：`/api/choreo` 与 `/api/nisar_product`。
+
 ## 架构
 
 ```
@@ -97,7 +112,7 @@ NISAR（L 波段）与 Sentinel-1（C 波段）分别保存在**不同图层**�
   切片最高达 79%——已由分类别指标 + 置信区间的新报告取代。
 - 已记录的假阳性（城市地表、永久水体）通过 ESA WorldCover 10 m
   （built-up 与 permanent water 类别）**从淹没范围中剔除**。
-- `cd pipeline && uv run pytest tests/` — 87 个测试；`api/tests/` 9 个；
+- `cd pipeline && uv run pytest tests/` — 93 个测试；`api/tests/` 12 个；
   `web/` 20 个（vitest）。CI 在 GitHub Actions 上运行全部三套。
 
 ## 许可证

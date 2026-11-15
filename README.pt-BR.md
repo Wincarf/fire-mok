@@ -30,6 +30,24 @@ endpoints da API são espelhados em arquivos (`/api/municipalities`,
   `cd pipeline && uv run python ../scripts/build_pages.py --dist ../web/dist
   --out ../pages_site --data ../data` (dados em `data/` precisam existir).
 
+## A Dança e o card de segunda-feira (novos)
+
+- **A Dança** — três batidas reais do Sentinel-1 sobre a enchente de
+  maio/2024, em um slider de tempo com play: **pico 11/mai (203,7 km²,
+  ~70,8 mil pessoas expostas) → recessão 30/mai (47,6 km²) → calma 4/jun
+  (0 km²)**. Gerada por `pipeline/scripts/build_choreo.py` (leituras RTC
+  do Planetary Computer em grid comum, limpeza WorldCover, exposição areal
+  por município).
+- **Card de segunda-feira** — um clique transforma a batida escolhida em um
+  alerta pt-BR pronto para WhatsApp (copiar e colar). Toda linha vem de
+  dados reais; linha sem fonte (ex.: escolas/hospitais do OSM quando o
+  Overpass está inacessível) simplesmente não aparece — nunca inventada.
+- **Duet NISAR** — o modo dividido C×L e três camadas de banda L já estão
+  no app e aparecem sozinhos quando o primeiro produto banda L existir
+  (login Earthdata gratuito → secrets do repositório → rodar
+  *monitoring update*).
+- Novos endpoints: `/api/choreo` e `/api/nisar_product`.
+
 ## Arquitetura
 
 ```
@@ -104,7 +122,7 @@ não comparáveis por diferença.
 - Falsos positivos documentados (urbano, água permanente) são **cortados
   do extento** com ESA WorldCover 10 m (classes built-up e permanent
   water).
-- `cd pipeline && uv run pytest tests/` — 87 testes; `api/tests/` 9;
+- `cd pipeline && uv run pytest tests/` — 93 testes; `api/tests/` 12;
   `web/` 20 (vitest). CI roda os três no GitHub Actions.
 
 ## Licença
