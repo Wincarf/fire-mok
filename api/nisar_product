@@ -1,0 +1,25 @@
+{
+  "granule_id": "NISAR_L2_PR_GCOV_034_125_D_104_2005_DHDH_A_20261101T212603_20261101T212641_P05036_N_F_J_001",
+  "scene_datetime": "2026-11-01T21:26:03Z",
+  "polarization": "HHHH",
+  "cog": "NISAR_L2_PR_GCOV_034_125_D_104_2005_DHDH_A_20261101T212603_20261101T212641_P05036_N_F_J_001_HHHH_db.tif",
+  "source": "NISAR L2 GCOV — ASF DAAC (Earthdata)",
+  "generated": "2026-11-15",
+  "lband": {
+    "pixels": 11993425,
+    "mean_db": -13.55,
+    "p05_db": -21.7,
+    "std_db": 19.47,
+    "low_backscatter_fraction": 0.024
+  },
+  "duet": {
+    "hh": "nisar_hh_db.tif",
+    "lwater": "nisar_lwater.tif",
+    "threshold_db": -42.75,
+    "lwater_km2": 114.52,
+    "diff": "nisar_diff.tif",
+    "c_source": "flood_extent_latest.tif",
+    "c_only_km2": 53.27,
+    "l_only_km2": 113.06
+  }
+}
