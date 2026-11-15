@@ -147,6 +147,9 @@ def main() -> int:
         "susceptibility": TILE_LAYERS["susceptibility"][0],
         "hand": "terrain/hand_guaiba.tif",
         "dem": "terrain/cop_dem_glo30_guaiba.tif",
+        "nisar_hh": TILE_LAYERS["nisar_hh"][0],
+        "nisar_lwater": TILE_LAYERS["nisar_lwater"][0],
+        "nisar_diff": TILE_LAYERS["nisar_diff"][0],
     }
     layers = []
     for name, rel in LAYERS.items():
