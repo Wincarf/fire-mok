@@ -24,6 +24,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from pipeline.aoi import get_aoi
 from pipeline.nisar import (
     download_gcov,
+    duet_products,
     earthdata_session,
     gcov_to_cog,
     inventory_payload,
@@ -89,6 +90,12 @@ def main() -> int:
         "generated": end,
         "lband": stats,
     }
+    try:
+        s1 = DATA / "sar" / "flood_extent_may2024.tif"
+        status["duet"] = duet_products(cog, aoi.bbox, None, s1, DATA / "nisar")
+        logger.info("duet layers: %s", status["duet"])
+    except Exception as exc:
+        logger.warning("duet layers skipped: %s", exc)
     (out_dir / "nisar_status.json").write_text(
         json.dumps(status, ensure_ascii=False, indent=2), encoding="utf-8"
     )

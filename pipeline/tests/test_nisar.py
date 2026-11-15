@@ -7,9 +7,11 @@ import rasterio
 
 from pipeline.nisar import (
     _gcov_dataset_path,
+    duet_diff,
     earthdata_session,
     inventory_payload,
     lband_stats_over_bbox,
+    lband_water_mask,
     search_nisar_gcov,
     summarize_lband_db,
 )
@@ -55,6 +57,30 @@ def test_inventory_payload_shape():
     assert p["scenes"][0]["id"] == "g1"
     assert p["mission"].startswith("NISAR")
     assert p["bbox"] == list(bbox)
+
+
+def test_lband_water_mask_excludes_context_and_small_blobs():
+    db = np.full((20, 20), -15.0, dtype="float32")
+    db[4:12, 4:12] = -35.0      # open-water blob (64 px)
+    db[0:2, 0:2] = -35.0        # tiny blob (4 px) — below min_px
+    urban = np.zeros((20, 20), dtype=bool)
+    urban[16:18, 16:18] = True
+    db[16:18, 16:18] = -35.0    # urban low-sigma0 false positive
+    perm = np.zeros((20, 20), dtype=bool)
+
+    w = lband_water_mask(db, -20.0, urban, perm, min_px=5)
+    assert w[8, 8]        # real blob kept
+    assert not w[0, 0]    # speckle dropped
+    assert not w[16, 16]  # urban context removed
+
+
+def test_duet_diff_classes():
+    lw = np.zeros((4, 4), dtype=bool)
+    lw[0, 0] = True   # L-band-only
+    cw = np.zeros((4, 4), dtype=bool)
+    cw[1, 1] = True   # C-band-only
+    d = duet_diff(lw, cw)
+    assert d[0, 0] == 2 and d[1, 1] == 1 and d[2, 2] == 0
 
 
 def test_earthdata_session_returns_none_without_creds(monkeypatch, tmp_path):
