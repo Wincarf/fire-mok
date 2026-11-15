@@ -1,0 +1,278 @@
+{
+  "product": "Sentinel-1 RTC flood choreography (Guaíba, May-2024 flood)",
+  "method": "sigma0 < -15 dB vs 2024-06-04 baseline; WorldCover permanent-water/urban cleaning; min blob 1 ha; population exposure via areal interpolation",
+  "baseline_scene": "S1A_IW_GRDH_1SDV_20240604T084924_20240604T084953_054171_069681_rtc",
+  "aoi": "guaiba",
+  "bbox": [
+    -51.6,
+    -30.4,
+    -50.7,
+    -29.7
+  ],
+  "generated": "2026-11-15",
+  "beats": [
+    {
+      "date": "2024-05-11",
+      "label": "peak",
+      "scene_id": "S1A_IW_GRDH_1SDV_20240511T084943_20240511T085008_053821_068A6E_rtc",
+      "layer": "choreo_extent_20240511",
+      "flood_km2": 203.69,
+      "munis_affected": 19,
+      "pop_exposed_est": 70851,
+      "municipalities": [
+        {
+          "code": "4322004",
+          "name": "Triunfo",
+          "flooded_m2": 43559195,
+          "pop_exposed_est": 1481
+        },
+        {
+          "code": "4323002",
+          "name": "Viamão",
+          "flooded_m2": 35611027,
+          "pop_exposed_est": 5318
+        },
+        {
+          "code": "4313375",
+          "name": "Nova Santa Rita",
+          "flooded_m2": 30343045,
+          "pop_exposed_est": 3807
+        },
+        {
+          "code": "4306767",
+          "name": "Eldorado do Sul",
+          "flooded_m2": 25554482,
+          "pop_exposed_est": 1983
+        },
+        {
+          "code": "4305355",
+          "name": "Charqueadas",
+          "flooded_m2": 14620620,
+          "pop_exposed_est": 2354
+        },
+        {
+          "code": "4314902",
+          "name": "Porto Alegre",
+          "flooded_m2": 10802257,
+          "pop_exposed_est": 29585
+        },
+        {
+          "code": "4304689",
+          "name": "Capela de Santana",
+          "flooded_m2": 10133909,
+          "pop_exposed_est": 600
+        },
+        {
+          "code": "4312401",
+          "name": "Montenegro",
+          "flooded_m2": 6998448,
+          "pop_exposed_est": 1053
+        },
+        {
+          "code": "4304606",
+          "name": "Canoas",
+          "flooded_m2": 6692919,
+          "pop_exposed_est": 18379
+        },
+        {
+          "code": "4301909",
+          "name": "Barra do Ribeiro",
+          "flooded_m2": 4955093,
+          "pop_exposed_est": 85
+        },
+        {
+          "code": "4309050",
+          "name": "Glorinha",
+          "flooded_m2": 2955084,
+          "pop_exposed_est": 68
+        },
+        {
+          "code": "4309209",
+          "name": "Gravataí",
+          "flooded_m2": 2653673,
+          "pop_exposed_est": 1497
+        },
+        {
+          "code": "4309308",
+          "name": "Guaíba",
+          "flooded_m2": 2129141,
+          "pop_exposed_est": 528
+        },
+        {
+          "code": "4307708",
+          "name": "Esteio",
+          "flooded_m2": 900886,
+          "pop_exposed_est": 2898
+        },
+        {
+          "code": "4314803",
+          "name": "Portão",
+          "flooded_m2": 601035,
+          "pop_exposed_est": 133
+        },
+        {
+          "code": "4300604",
+          "name": "Alvorada",
+          "flooded_m2": 181285,
+          "pop_exposed_est": 624
+        },
+        {
+          "code": "4303103",
+          "name": "Cachoeirinha",
+          "flooded_m2": 110472,
+          "pop_exposed_est": 334
+        },
+        {
+          "code": "4320008",
+          "name": "Sapucaia do Sul",
+          "flooded_m2": 52704,
+          "pop_exposed_est": 124
+        },
+        {
+          "code": "4317608",
+          "name": "Santo Antônio da Patrulha",
+          "flooded_m2": 11969,
+          "pop_exposed_est": 0
+        }
+      ],
+      "facilities": null
+    },
+    {
+      "date": "2024-05-30",
+      "label": "recession",
+      "scene_id": "S1A_IW_GRDH_1SDV_20240530T084128_20240530T084157_054098_069407_rtc",
+      "layer": "choreo_extent_20240530",
+      "flood_km2": 47.57,
+      "munis_affected": 19,
+      "pop_exposed_est": 14378,
+      "municipalities": [
+        {
+          "code": "4323002",
+          "name": "Viamão",
+          "flooded_m2": 26666959,
+          "pop_exposed_est": 3982
+        },
+        {
+          "code": "4309050",
+          "name": "Glorinha",
+          "flooded_m2": 2743528,
+          "pop_exposed_est": 63
+        },
+        {
+          "code": "4309209",
+          "name": "Gravataí",
+          "flooded_m2": 1917441,
+          "pop_exposed_est": 1082
+        },
+        {
+          "code": "4301909",
+          "name": "Barra do Ribeiro",
+          "flooded_m2": 1563144,
+          "pop_exposed_est": 27
+        },
+        {
+          "code": "4321204",
+          "name": "Taquara",
+          "flooded_m2": 1377381,
+          "pop_exposed_est": 164
+        },
+        {
+          "code": "4314902",
+          "name": "Porto Alegre",
+          "flooded_m2": 1317967,
+          "pop_exposed_est": 3610
+        },
+        {
+          "code": "4313409",
+          "name": "Novo Hamburgo",
+          "flooded_m2": 1001909,
+          "pop_exposed_est": 1007
+        },
+        {
+          "code": "4313375",
+          "name": "Nova Santa Rita",
+          "flooded_m2": 842171,
+          "pop_exposed_est": 106
+        },
+        {
+          "code": "4304606",
+          "name": "Canoas",
+          "flooded_m2": 841350,
+          "pop_exposed_est": 2310
+        },
+        {
+          "code": "4303905",
+          "name": "Campo Bom",
+          "flooded_m2": 543341,
+          "pop_exposed_est": 630
+        },
+        {
+          "code": "4314803",
+          "name": "Portão",
+          "flooded_m2": 311007,
+          "pop_exposed_est": 69
+        },
+        {
+          "code": "4307708",
+          "name": "Esteio",
+          "flooded_m2": 280409,
+          "pop_exposed_est": 902
+        },
+        {
+          "code": "4319901",
+          "name": "Sapiranga",
+          "flooded_m2": 195505,
+          "pop_exposed_est": 105
+        },
+        {
+          "code": "4300604",
+          "name": "Alvorada",
+          "flooded_m2": 80491,
+          "pop_exposed_est": 277
+        },
+        {
+          "code": "4309308",
+          "name": "Guaíba",
+          "flooded_m2": 37996,
+          "pop_exposed_est": 9
+        },
+        {
+          "code": "4317608",
+          "name": "Santo Antônio da Patrulha",
+          "flooded_m2": 18667,
+          "pop_exposed_est": 1
+        },
+        {
+          "code": "4314050",
+          "name": "Parobé",
+          "flooded_m2": 14577,
+          "pop_exposed_est": 7
+        },
+        {
+          "code": "4320008",
+          "name": "Sapucaia do Sul",
+          "flooded_m2": 9444,
+          "pop_exposed_est": 22
+        },
+        {
+          "code": "4303103",
+          "name": "Cachoeirinha",
+          "flooded_m2": 1731,
+          "pop_exposed_est": 5
+        }
+      ],
+      "facilities": null
+    },
+    {
+      "date": "2024-06-04",
+      "label": "calm",
+      "scene_id": "S1A_IW_GRDH_1SDV_20240604T084924_20240604T084953_054171_069681_rtc",
+      "layer": "choreo_extent_20240604",
+      "flood_km2": 0.0,
+      "munis_affected": 0,
+      "pop_exposed_est": 0,
+      "municipalities": [],
+      "facilities": null
+    }
+  ]
+}
