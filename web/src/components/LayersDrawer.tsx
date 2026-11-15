@@ -6,12 +6,16 @@ type Props = {
   onToggle: (k: keyof Vis, v: boolean) => void;
   summary: { exposed: number; critical: number };
   lastPass: string;
+  nisarReady?: boolean;
 };
 
-const LAYERS: { key: keyof Vis; name: string; chip: string; dot: string }[] = [
+const LAYERS: { key: keyof Vis; name: string; chip: string; dot: string; gate?: string }[] = [
   { key: "muni", name: "Municipalities by risk", chip: "IBGE", dot: "bg-error" },
   { key: "flood", name: "Water where it shouldn't be", chip: "SAR", dot: "bg-primary" },
   { key: "sus", name: "Naturally flood-prone areas", chip: "DEM", dot: "bg-tertiary-container" },
+  { key: "nisarHh", name: "NISAR backscatter (L-band)", chip: "NISAR", dot: "bg-tertiary-container", gate: "nisar_hh" },
+  { key: "nisarWater", name: "NISAR open water (L-band)", chip: "NISAR", dot: "bg-[#22d3ee]", gate: "nisar_hh" },
+  { key: "nisarDiff", name: "Duet: L sees, C can't", chip: "C×L", dot: "bg-[#f97316]", gate: "nisar_diff" },
 ];
 
 const RISK = [
@@ -21,7 +25,7 @@ const RISK = [
   { label: "low", cls: "bg-[#94a3b8]" },
 ];
 
-export function LayersDrawer({ layers, onToggle, summary, lastPass }: Props) {
+export function LayersDrawer({ layers, onToggle, summary, lastPass, nisarReady }: Props) {
   return (
     <aside className="fixed left-0 top-16 bottom-0 w-64 z-40 bg-surface-container-lowest border-r border-outline-variant flex flex-col justify-between">
       <div className="p-space-md flex flex-col gap-space-md overflow-y-auto no-scrollbar">
@@ -33,15 +37,19 @@ export function LayersDrawer({ layers, onToggle, summary, lastPass }: Props) {
         </div>
 
         <div className="space-y-space-xs">
-          {LAYERS.map((l) => (
+          {LAYERS.map((l) => {
+            const gated = !!l.gate && !nisarReady;
+            return (
             <label
               key={l.key}
-              className="p-space-sm rounded-lg bg-surface-container-low flex items-center justify-between cursor-pointer hover:bg-surface-container transition-colors"
+              title={gated ? "awaiting the first NISAR product (free Earthdata login)" : undefined}
+              className={`p-space-sm rounded-lg bg-surface-container-low flex items-center justify-between transition-colors ${gated ? "opacity-40" : "cursor-pointer hover:bg-surface-container"}`}
             >
               <span className="flex items-center gap-space-sm">
                 <input
                   type="checkbox"
-                  checked={layers[l.key]}
+                  checked={!!layers[l.key]}
+                  disabled={gated}
                   onChange={(e) => onToggle(l.key, e.target.checked)}
                   className="w-4 h-4 rounded-sm accent-primary"
                 />
@@ -52,7 +60,8 @@ export function LayersDrawer({ layers, onToggle, summary, lastPass }: Props) {
                 {l.chip}
               </span>
             </label>
-          ))}
+            );
+          })}
         </div>
 
         <div className="px-space-sm">

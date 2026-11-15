@@ -4,8 +4,10 @@ import type { Vis } from "./vis";
 import { STORY, type Step } from "./story";
 import { StoryOverlay } from "./components/StoryOverlay";
 import { Header } from "./components/Header";
+import { ChoreoBar } from "./components/ChoreoBar";
 import { LayersDrawer } from "./components/LayersDrawer";
 import { MapHud } from "./components/MapHud";
+import { MondayCard } from "./components/MondayCard";
 import { TriagePanel } from "./components/TriagePanel";
 import { Timeline } from "./components/Timeline";
 import { summarizeMunicipalities, countByCategory } from "./stats";
@@ -44,6 +46,15 @@ const FLOOD_CMAP = encodeURIComponent(
 const SUS_CMAP = encodeURIComponent(
   JSON.stringify({ 0: [0, 0, 0, 0], 1: [37, 99, 235, 140] })
 );
+const CHOREO_CMAP = encodeURIComponent(
+  JSON.stringify({ 0: [0, 0, 0, 0], 1: [37, 99, 235, 150] })
+);
+const NISAR_WATER_CMAP = encodeURIComponent(
+  JSON.stringify({ 0: [0, 0, 0, 0], 1: [34, 211, 238, 170] })
+);
+const DIFF_CMAP = encodeURIComponent(
+  JSON.stringify({ 0: [0, 0, 0, 0], 1: [220, 38, 38, 160], 2: [34, 211, 238, 190] })
+);
 const RISK_COLOR: Record<string, string> = {
   critical: "#ef4444", // red-500
   high: "#f97316", // orange-500 — clearly distinct from yellow
@@ -65,7 +76,10 @@ const EMPTY_FC = { type: "FeatureCollection", features: [] } as any;
 const fedSources = new WeakSet<object>(); // don't setData the same source twice
 
 // mode "risk" = basemap + choropleth only; "before"/"after" add the SAR scene
-function styleFor(vis: Vis, mode: "risk" | "before" | "after"): maplibregl.StyleSpecification {
+function styleFor(
+  vis: Vis,
+  mode: "risk" | "before" | "after" | "nisar"
+): maplibregl.StyleSpecification {
   const s: maplibregl.StyleSpecification = {
     version: 8,
     sources: {
@@ -85,6 +99,21 @@ function styleFor(vis: Vis, mode: "risk" | "before" | "after"): maplibregl.Style
         tiles: [withBase(`/tiles/susceptibility/{z}/{x}/{y}.png?colormap=${SUS_CMAP}`)],
         tileSize: 256,
       },
+      "choreo-peak": {
+        type: "raster",
+        tiles: [withBase(`/tiles/choreo_peak/{z}/{x}/{y}.png?colormap=${CHOREO_CMAP}`)],
+        tileSize: 256,
+      },
+      "choreo-recession": {
+        type: "raster",
+        tiles: [withBase(`/tiles/choreo_recession/{z}/{x}/{y}.png?colormap=${CHOREO_CMAP}`)],
+        tileSize: 256,
+      },
+      "choreo-calm": {
+        type: "raster",
+        tiles: [withBase(`/tiles/choreo_calm/{z}/{x}/{y}.png?colormap=${CHOREO_CMAP}`)],
+        tileSize: 256,
+      },
       muni: { type: "geojson", data: EMPTY_FC },
     },
     layers: [
@@ -100,6 +129,24 @@ function styleFor(vis: Vis, mode: "risk" | "before" | "after"): maplibregl.Style
         type: "raster",
         source: "flood",
         layout: { visibility: show(vis.flood) },
+      } as any,
+      {
+        id: "choreo-peak",
+        type: "raster",
+        source: "choreo-peak",
+        layout: { visibility: "none" },
+      } as any,
+      {
+        id: "choreo-recession",
+        type: "raster",
+        source: "choreo-recession",
+        layout: { visibility: "none" },
+      } as any,
+      {
+        id: "choreo-calm",
+        type: "raster",
+        source: "choreo-calm",
+        layout: { visibility: "none" },
       } as any,
       {
         id: "muni-fill",
@@ -150,6 +197,24 @@ function styleFor(vis: Vis, mode: "risk" | "before" | "after"): maplibregl.Style
       } as any,
     ],
   };
+  if (mode === "nisar") {
+    (s.sources as any)["nisar-hh"] = {
+      type: "raster",
+      tiles: [withBase(`/tiles/nisar_hh/{z}/{x}/{y}.png?${GRAY}`)],
+      tileSize: 256,
+    };
+    (s.sources as any)["nisar-water"] = {
+      type: "raster",
+      tiles: [withBase(`/tiles/nisar_lwater/{z}/{x}/{y}.png?colormap=${NISAR_WATER_CMAP}`)],
+      tileSize: 256,
+    };
+    s.layers.splice(
+      1,
+      0,
+      { id: "nisar-hh", type: "raster", source: "nisar-hh" } as any,
+      { id: "nisar-water", type: "raster", source: "nisar-water" } as any
+    );
+  }
   if (mode !== "risk") {
     (s.sources as any).sar = {
       type: "raster",
@@ -177,7 +242,17 @@ export default function App() {
   const layersRef = useRef(layers);
   const selCodeRef = useRef(selCode);
   const muniFc = useRef<any>(null); // full FeatureCollection for maplibre sources
+  const beatRef = useRef<number | null>(null);
+  const choreoRef = useRef<any>(null);
+  const danceMuted = useRef(false);
   const [compare, setCompare] = useState(false);
+  const [duet, setDuet] = useState(false);
+  const [nisarReady, setNisarReady] = useState(false);
+  const [avail, setAvail] = useState<Set<string>>(new Set());
+  const [choreo, setChoreo] = useState<any>(null);
+  const [beat, setBeat] = useState<number | null>(null);
+  const [playing, setPlaying] = useState(false);
+  const [cardBeat, setCardBeat] = useState<number | null>(null);
   const [split, setSplit] = useState(50);
   const [step, setStep] = useState<number | null>(0);
   const [tiler, setTiler] = useState<"loading" | "online" | "offline">("loading");
@@ -194,6 +269,8 @@ export default function App() {
   // leaving story mode lands on the plain risk view
   const exitStory = () => {
     setStep(null);
+    setBeat(null);
+    setPlaying(false);
     setLayers({ flood: false, sus: false, muni: true });
   };
 
@@ -210,7 +287,7 @@ export default function App() {
     m.on("mouseleave", "muni-fill", () => (m.getCanvas().style.cursor = ""));
   };
 
-  const applyVis = (m: maplibregl.Map, l: Vis) => {
+  const applyVis = (m: maplibregl.Map, l: Vis, freezeNisar = false) => {
     // only set when different — styledata refires on setLayoutProperty and
     // would loop forever if we re-set the same value
     const v = (id: string, on: boolean) => {
@@ -220,8 +297,25 @@ export default function App() {
     };
     v("flood", l.flood);
     v("sus", l.sus);
+    if (!freezeNisar) {
+      v("nisar-hh", !!l.nisarHh);
+      v("nisar-water", !!l.nisarWater);
+      v("nisar-diff", !!l.nisarDiff);
+    }
     v("muni-fill", l.muni);
     v("muni-line", l.muni);
+  };
+
+  // the dance: exactly one choreo beat visible at a time
+  const applyChoreo = (m: maplibregl.Map | null, b: number | null) => {
+    if (!m) return;
+    const beats: any[] = choreoRef.current?.beats ?? [];
+    beats.forEach((_, i) => {
+      const id = `choreo-${i}`;
+      const want = show(b === i);
+      if (m.getLayer(id) && m.getLayoutProperty(id, "visibility") !== want)
+        m.setLayoutProperty(id, "visibility", want);
+    });
   };
 
   useEffect(() => {
@@ -242,6 +336,7 @@ export default function App() {
     // skipped silently while isStyleLoaded() was false and flood stayed hidden
     m.on("styledata", () => {
       applyVis(m, layersRef.current);
+      applyChoreo(m, beatRef.current);
       const src = m.getSource("muni") as maplibregl.GeoJSONSource | undefined;
       if (muniFc.current && src && !fedSources.has(src)) {
         src.setData(muniFc.current);
@@ -280,23 +375,35 @@ export default function App() {
         }
       })
       .catch(() => {});
+    fetch(withBase("/api/choreo"))
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!d) return;
+        choreoRef.current = d;
+        setChoreo(d);
+      })
+      .catch(() => {});
     return () => {
       cancelAnimationFrame(coordRaf);
       m.remove();
     };
   }, []);
 
-  // compare mode: second map (SAR recession) under the clipped "peak" view
-  const comparePrev = useRef(false);
+  // split mode: "sar" = recession vs peak; "duet" = Sentinel-1 C vs NISAR L
+  type SplitMode = "off" | "sar" | "duet";
+  const splitModePrev = useRef<SplitMode>("off");
+  const splitMode: SplitMode = compare ? "sar" : duet ? "duet" : "off";
   useEffect(() => {
     const m = map.current;
-    if (!m || compare === comparePrev.current) return; // skip the mount pass —
-    comparePrev.current = compare; // constructor style already matches "risk"
-    m.setStyle(styleFor(layersRef.current, compare ? "after" : "risk"));
-    if (!compare || !beforeRef.current) return;
+    if (!m || splitMode === splitModePrev.current) return; // skip the mount pass —
+    splitModePrev.current = splitMode; // constructor style already matches "risk"
+    m.setStyle(
+      styleFor(layersRef.current, splitMode === "off" ? "risk" : "after")
+    );
+    if (splitMode === "off" || !beforeRef.current) return;
     const m2 = new maplibregl.Map({
       container: beforeRef.current,
-      style: styleFor(layersRef.current, "before"),
+      style: styleFor(layersRef.current, splitMode === "sar" ? "before" : "nisar"),
       center: m.getCenter(),
       zoom: m.getZoom(),
       attributionControl: false,
@@ -304,7 +411,9 @@ export default function App() {
     (window as any).__map2 = m2; // dev/e2e hook
     m2.on("load", () => attachCursors(m2));
     m2.on("styledata", () => {
-      applyVis(m2, layersRef.current);
+      // duet right map owns its NISAR visibility (style-defined)
+      applyVis(m2, layersRef.current, splitMode === "duet");
+      applyChoreo(m2, beatRef.current);
       if (m2.getLayer("muni-sel"))
         m2.setFilter("muni-sel", ["==", ["get", "code"], selCodeRef.current ?? "__none__"] as any);
     });
@@ -332,16 +441,69 @@ export default function App() {
       beforeMap.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [compare]);
+  }, [compare, duet]);
+
+  // NISAR layers join both maps only once the product shows up in /api/layers
+  useEffect(() => {
+    if (!avail.has("nisar_hh")) return;
+    for (const m of [map.current, beforeMap.current]) {
+      if (!m || m.getSource("nisar-hh")) continue;
+      m.addSource("nisar-hh", {
+        type: "raster",
+        tiles: [withBase(`/tiles/nisar_hh/{z}/{x}/{y}.png?${GRAY}`)],
+        tileSize: 256,
+      } as any);
+      m.addSource("nisar-water", {
+        type: "raster",
+        tiles: [withBase(`/tiles/nisar_lwater/{z}/{x}/{y}.png?colormap=${NISAR_WATER_CMAP}`)],
+        tileSize: 256,
+      } as any);
+      m.addSource("nisar-diff", {
+        type: "raster",
+        tiles: [withBase(`/tiles/nisar_diff/{z}/{x}/{y}.png?colormap=${DIFF_CMAP}`)],
+        tileSize: 256,
+      } as any);
+      m.addLayer({ id: "nisar-hh", type: "raster", source: "nisar-hh", layout: { visibility: show(!!layersRef.current.nisarHh) } } as any, "muni-fill");
+      m.addLayer({ id: "nisar-water", type: "raster", source: "nisar-water", layout: { visibility: show(!!layersRef.current.nisarWater) } } as any, "muni-fill");
+      m.addLayer({ id: "nisar-diff", type: "raster", source: "nisar-diff", layout: { visibility: show(!!layersRef.current.nisarDiff) } } as any, "muni-fill");
+    }
+    setNisarReady(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [avail, compare, duet]);
+
+  // dance state: mute competing overlays once per dance session
+  useEffect(() => {
+    beatRef.current = beat;
+    if (beat !== null && !danceMuted.current) {
+      danceMuted.current = true;
+      setLayers((l) => ({ ...l, flood: false, sus: false }));
+    }
+    if (beat === null) danceMuted.current = false;
+    for (const m of [map.current, beforeMap.current])
+      if (m && m.isStyleLoaded()) applyChoreo(m, beat);
+  }, [beat]);
+
+  // play = loop the three beats
+  useEffect(() => {
+    if (!playing) return;
+    const n = choreoRef.current?.beats?.length ?? 3;
+    const t = setInterval(() => setBeat((b) => (b === null ? 0 : (b + 1) % n)), 1400);
+    return () => clearInterval(t);
+  }, [playing]);
 
   // rio-tiler health probe for the header status pill
   useEffect(() => {
     const t0 = performance.now();
     fetch(withBase("/api/layers"))
       .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
-      .then(() => {
+      .then((d) => {
         setTiler("online");
         setTilerMs(Math.round(performance.now() - t0));
+        setAvail(
+          new Set(
+            (d?.layers ?? []).filter((e: any) => e.available).map((e: any) => e.id)
+          )
+        );
       })
       .catch(() => setTiler("offline"));
   }, []);
@@ -402,7 +564,11 @@ export default function App() {
         tilerMs={tilerMs}
         coords={coords}
         onExport={() => downloadJson("/api/municipalities", "municipal_risk_may2024.geojson")}
-        onStory={() => setStep(0)}
+        onStory={() => {
+          setBeat(null);
+          setPlaying(false);
+          setStep(0);
+        }}
       />
 
       <LayersDrawer
@@ -410,6 +576,7 @@ export default function App() {
         onToggle={(k, v) => setLayers((l) => ({ ...l, [k]: v }))}
         summary={summary}
         lastPass={sarSceneDate(SAR_SCENE_BEFORE)}
+        nisarReady={nisarReady}
       />
 
       <main className="pl-64 pt-16 h-full relative">
@@ -420,8 +587,22 @@ export default function App() {
           beforeRef={beforeRef}
           containerRef={wrap}
           counts={counts}
-          compare={compare}
-          onCompare={() => setCompare((c) => !c)}
+          compare={compare || duet}
+          onCompare={() => {
+            setCompare((c) => !c);
+            setDuet(false);
+          }}
+          showDuet={nisarReady}
+          duet={duet}
+          onDuet={() => {
+            setDuet((d) => !d);
+            setCompare(false);
+          }}
+          splitLabels={
+            duet
+              ? { left: "SENTINEL-1 C-BAND · 11/MAY/24", right: "NISAR L-BAND · OPEN WATER" }
+              : undefined
+          }
           split={split}
           onDividerDown={(e) => {
             e.preventDefault();
@@ -446,7 +627,20 @@ export default function App() {
             onExportFlood={() => downloadJson("/api/flood_polygons", "flooded_areas_may2024.geojson")}
           />
         )}
-        <Timeline step={step} onChapter={setStep} />
+        {step !== null && <Timeline step={step} onChapter={setStep} />}
+        {step === null && choreo && (
+          <ChoreoBar
+            beats={choreo.beats}
+            beat={beat}
+            playing={playing}
+            onBeat={(i) => setBeat(i === beat ? null : i)}
+            onPlay={() => setPlaying((p) => !p)}
+            onCard={(i) => setCardBeat(i)}
+          />
+        )}
+        {cardBeat !== null && choreo && (
+          <MondayCard beatData={choreo.beats[cardBeat]} onClose={() => setCardBeat(null)} />
+        )}
         {step !== null && (
           <StoryOverlay
             index={step}

@@ -11,6 +11,10 @@ type Props = {
   counts: RiskCounts;
   compare: boolean;
   onCompare: () => void;
+  showDuet?: boolean;
+  duet?: boolean;
+  onDuet?: () => void;
+  splitLabels?: { left: string; right: string };
   split: number;
   onDividerDown: (e: PointerEvent<HTMLDivElement>) => void;
   children?: ReactNode;
@@ -32,6 +36,10 @@ export function MapHud({
   counts,
   compare,
   onCompare,
+  showDuet,
+  duet,
+  onDuet,
+  splitLabels,
   split,
   onDividerDown,
   children,
@@ -70,13 +78,13 @@ export function MapHud({
           <div className="px-space-md py-space-xs rounded bg-surface-container-lowest/90 backdrop-blur-md border border-outline-variant flex items-center gap-space-sm">
             <span className="w-2.5 h-2.5 rounded-full bg-primary" />
             <span className="font-label-mono-xs text-label-mono-xs text-on-surface font-semibold tracking-wider">
-              RECESSION · 04/JUN/24
+              {splitLabels?.left ?? "RECESSION · 04/JUN/24"}
             </span>
           </div>
           <div className="px-space-md py-space-xs rounded bg-surface-container-lowest/90 backdrop-blur-md border border-outline-variant flex items-center gap-space-sm">
             <span className="w-2.5 h-2.5 rounded-full bg-error animate-pulse" />
             <span className="font-label-mono-xs text-label-mono-xs text-on-surface font-semibold tracking-wider">
-              SAR PEAK · 11/MAY/24
+              {splitLabels?.right ?? "SAR PEAK · 11/MAY/24"}
             </span>
           </div>
         </div>
@@ -126,6 +134,20 @@ export function MapHud({
         >
           <span className="material-symbols-outlined text-[18px]">compare</span>
         </button>
+        {showDuet && onDuet && (
+          <button
+            type="button"
+            onClick={onDuet}
+            title="Duet — Sentinel-1 C-band (2024) vs NISAR L-band"
+            className={`w-9 h-9 rounded border shadow-md flex items-center justify-center transition-colors ${
+              duet
+                ? "bg-primary/20 border-primary text-primary"
+                : "bg-surface-container-low hover:bg-surface-container-high border-outline-variant text-on-surface hover:text-primary"
+            }`}
+          >
+            <span className="material-symbols-outlined text-[18px]">swap_horiz</span>
+          </button>
+        )}
       </div>
 
       {/* Swipe divider — centered on the clip boundary (group is ~32px wide) */}
