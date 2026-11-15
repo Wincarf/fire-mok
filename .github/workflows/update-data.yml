@@ -35,6 +35,9 @@ jobs:
             --lookback-days "${{ github.event.inputs.lookback_days || 14 }}"
       # NISAR (NASA–ISRO): public GCOV inventory always; L-band product once
       # EARTHDATA_USER/EARTHDATA_PASS secrets are set (free account).
+      # Auth failure (e.g. incomplete EDL profile) falls back to
+      # inventory-only — the run stays green and the daily monitoring
+      # never blocks on Earthdata.
       - run: uv run python scripts/build_nisar.py
         env:
           EARTHDATA_USER: ${{ secrets.EARTHDATA_USER }}
