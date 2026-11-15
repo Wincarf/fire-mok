@@ -94,6 +94,22 @@ def test_earthdata_session_returns_none_without_creds(monkeypatch, tmp_path):
     assert session is None
 
 
+def test_earthdata_session_auth_failure_returns_none(monkeypatch):
+    import asf_search.exceptions
+
+    class _Boom:
+        def auth_with_creds(self, user, password):
+            raise asf_search.exceptions.ASFAuthenticationError(
+                "401: update profile attributes (Study Area)"
+            )
+
+    monkeypatch.setenv("EARTHDATA_USER", "user")
+    monkeypatch.setenv("EARTHDATA_PASS", "pass")
+    monkeypatch.setattr("asf_search.ASFSession", _Boom)
+
+    assert earthdata_session() is None
+
+
 def test_search_nisar_gcov_empty_returns_list(monkeypatch):
     monkeypatch.setattr("asf_search.search", lambda **kw: [])
     assert search_nisar_gcov((-51.6, -30.4, -50.7, -29.7), "2026-10-21", "2026-11-14") == []

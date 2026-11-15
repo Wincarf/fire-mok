@@ -122,7 +122,7 @@ não comparáveis por diferença.
 - Falsos positivos documentados (urbano, água permanente) são **cortados
   do extento** com ESA WorldCover 10 m (classes built-up e permanent
   water).
-- `cd pipeline && uv run pytest tests/` — 93 testes; `api/tests/` 12;
+- `cd pipeline && uv run pytest tests/` — 94 testes; `api/tests/` 12;
   `web/` 20 (vitest). CI roda os três no GitHub Actions.
 
 ## Licença

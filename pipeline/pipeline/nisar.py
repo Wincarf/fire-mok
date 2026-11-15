@@ -6,9 +6,11 @@ import os
 from pathlib import Path
 
 import asf_search as asf
+from asf_search.exceptions import ASFAuthenticationError
 import h5py
 import numpy as np
 import rasterio
+import requests
 from rasterio.transform import from_origin
 
 from pipeline.types import Scene
@@ -22,7 +24,20 @@ def earthdata_session() -> "asf.ASFSession | None":
     user = os.environ.get("EARTHDATA_USER")
     password = os.environ.get("EARTHDATA_PASS")
     if user and password:
-        return asf.ASFSession().auth_with_creds(user, password)
+        try:
+            return asf.ASFSession().auth_with_creds(user, password)
+        except ASFAuthenticationError as exc:
+            logger.warning(
+                "Earthdata auth refused (%s) -> inventory-only. Check the "
+                "password and the required EDL profile fields (Country, "
+                "Organization, Study Area, Primary Data Use) at "
+                "https://urs.earthdata.nasa.gov/profile",
+                exc,
+            )
+            return None
+        except requests.RequestException as exc:
+            logger.warning("Earthdata auth network error (%s) -> inventory-only", exc)
+            return None
     try:
         if netrc_mod.netrc().authenticators(URS_HOST):
             # requests/ASFSession honors netrc via trust_env
