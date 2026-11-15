@@ -28,8 +28,9 @@ jobs:
         with:
           python-version: "3.13"
       - run: uv sync --frozen
-      # downloads scenes only when a new full-coverage pair exists;
-      # otherwise logs "up to date" and exits in seconds
+      # downloads scenes when a new full-coverage pair exists in the default
+      # window; without a pair AND without an extent on disk (fresh CI
+      # workspace) it rebuilds the reference extent from a 30-day lookback
       - run: |
           uv run python scripts/update_latest.py \
             --lookback-days "${{ github.event.inputs.lookback_days || 14 }}"
