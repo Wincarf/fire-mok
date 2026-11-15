@@ -91,7 +91,15 @@ def main() -> int:
         "lband": stats,
     }
     try:
-        s1 = DATA / "sar" / "flood_extent_may2024.tif"
+        # C-band reference for the duet: the May-2024 anchor extent when it
+        # exists locally, else the latest S1 extent built by update_latest.
+        s1 = next(
+            (p for p in (DATA / "sar" / "flood_extent_may2024.tif",
+                         DATA / "sar" / "flood_extent_latest.tif") if p.exists()),
+            None,
+        )
+        if s1 is None:
+            logger.warning("no C-band extent on disk (may2024/latest) -> duet diff skipped")
         status["duet"] = duet_products(cog, aoi.bbox, None, s1, DATA / "nisar")
         logger.info("duet layers: %s", status["duet"])
     except Exception as exc:

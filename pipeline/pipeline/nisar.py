@@ -275,7 +275,7 @@ def duet_products(
     thresh = mean_std_threshold(finite, thresh_db)
 
     prof = {
-        "driver": "GTiff", "height": int(db.shape[0]), "width": int(db.shape[1]),
+        "driver": "GTiff", "count": 1, "height": int(db.shape[0]), "width": int(db.shape[1]),
         "crs": wcrs, "transform": wtransform, "nodata": np.nan,
         "dtype": "float32", "compress": "deflate",
     }
@@ -315,6 +315,7 @@ def duet_products(
         diff_out = out_dir / "nisar_diff.tif"
         write_mask_cog(diff, prof, diff_out)
         out["diff"] = diff_out.name
+        out["c_source"] = Path(s1_extent).name
         out["c_only_km2"] = round(float((diff == 1).sum()) * px_m2 / 1e6, 2)
         out["l_only_km2"] = round(float((diff == 2).sum()) * px_m2 / 1e6, 2)
     return out

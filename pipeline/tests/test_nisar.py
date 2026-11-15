@@ -110,6 +110,40 @@ def test_earthdata_session_auth_failure_returns_none(monkeypatch):
     assert earthdata_session() is None
 
 
+def test_duet_products_end_to_end(tmp_path, monkeypatch):
+    """Regression: duet writes all three COGs (missing count) and both km²."""
+    from rasterio.transform import from_origin
+    from rasterio.warp import transform_bounds
+
+    monkeypatch.setattr(
+        "pipeline.masks.fetch_worldcover_for_bounds",
+        lambda *a, **k: np.zeros((200, 200), dtype="uint8"),
+    )
+    l, b, r, t = transform_bounds("EPSG:4326", "EPSG:32727", -51.6, -30.4, -50.7, -29.7)
+    tr = from_origin(l, t, 30, 30)
+    cog = tmp_path / "hh.tif"
+    with rasterio.open(cog, "w", driver="GTiff", width=200, height=200, count=1,
+                       crs="EPSG:32727", transform=tr, dtype="float32",
+                       nodata=np.nan) as dst:
+        db = np.full((200, 200), -12.0, dtype="float32")
+        db[40:60, 40:60] = -38.0  # L-band-only water block
+        dst.write(db, 1)
+    s1 = tmp_path / "s1_extent.tif"
+    with rasterio.open(s1, "w", driver="GTiff", width=200, height=200, count=1,
+                       crs="EPSG:32727", transform=tr, dtype="uint8", nodata=0) as dst:
+        c = np.zeros((200, 200), dtype="uint8")
+        c[100:120, 100:120] = 1  # C-band-only water block
+        dst.write(c, 1)
+
+    out = duet_products(cog, (-51.6, -30.4, -50.7, -29.7), -30.0, s1, tmp_path / "out")
+
+    assert (tmp_path / "out" / "nisar_hh_db.tif").exists()
+    assert (tmp_path / "out" / "nisar_lwater.tif").exists()
+    assert (tmp_path / "out" / "nisar_diff.tif").exists()
+    assert out["lwater_km2"] > 0 and out["l_only_km2"] > 0 and out["c_only_km2"] > 0
+    assert out["c_source"] == "s1_extent.tif"
+
+
 def test_search_nisar_gcov_empty_returns_list(monkeypatch):
     monkeypatch.setattr("asf_search.search", lambda **kw: [])
     assert search_nisar_gcov((-51.6, -30.4, -50.7, -29.7), "2026-10-21", "2026-11-14") == []

@@ -42,6 +42,8 @@ jobs:
         env:
           EARTHDATA_USER: ${{ secrets.EARTHDATA_USER }}
           EARTHDATA_PASS: ${{ secrets.EARTHDATA_PASS }}
+      # One artifact carries everything: the S1 extent + polygons, the NISAR
+      # inventory/status and the L-band duet rasters under data/nisar/.
       - uses: actions/upload-artifact@v4
         with:
           name: flood-extent-latest
