@@ -1,6 +1,6 @@
 # Fire Mok
 
-[English](README.md) | [Português](README.pt-BR.md) | [Español](README.es.md) | [Français](README.fr.md) | **中文** | [Русский](README.ru.md)
+[English](README.md) | [Português](README.pt-BR.md) | [Español](README.es.md) | [Français](README.fr.md) | **中文** | [Русский](README.ru.md) | [العربية](README.ar.md)
 
 [![CI](https://github.com/Wincarf/fire-mok/actions/workflows/ci.yml/badge.svg)](https://github.com/Wincarf/fire-mok/actions/workflows/ci.yml)
 [![monitoring](https://github.com/Wincarf/fire-mok/actions/workflows/update-data.yml/badge.svg)](https://github.com/Wincarf/fire-mok/actions/workflows/update-data.yml)
@@ -18,7 +18,8 @@
 
 完整应用，无需后端——[`gh-pages`](https://github.com/Wincarf/fire-mok/tree/gh-pages)
 分支提供风险分级统计地图、2024 年 5 月 11 日洪水的真实 SAR 淹没范围、
-前后对比、引导式故事讲解和市政面板。API 端点以文件形式镜像
+前后对比、引导式故事讲解、市政面板，以及三个 NISAR L 波段图层
+（后向散射、开阔水域、C×L 二重奏）。API 端点以文件形式镜像
 （`/api/municipalities`、`/api/layers`、`/api/plan/{code}`，
 以及 z6–12 的预渲染瓦片）。
 
@@ -38,9 +39,11 @@
 - **周一晨报卡片** — 一键将所选时相转为葡萄牙语、可直接粘贴到 WhatsApp 的
   通报卡片。每行都来自真实数据；没有数据源的行（例如 Overpass 不可达时的
   学校/医院统计）会直接省略 — 绝不编造。
-- **NISAR 二重奏** — C×L 分屏模式与三个 L 波段图层已接入界面，一旦首个
-  L 波段产品生成即自动解锁（免费 Earthdata 账号 → 仓库 secrets → 运行
-  *monitoring update*）。
+- **NISAR 二重奏** — C×L 分屏模式与三个 L 波段图层（后向散射、开阔水域、
+  二重奏）**已上线**：首个 L 波段产品（2026 年 11 月 1 日的 GCOV 分块）
+  已由每日工作流生成并部署到 gh-pages。复现方式：注册免费 Earthdata
+  账号并填写必填资料（Study Area）+ 授权 ASF 应用 → 配置仓库 secrets →
+  运行 *monitoring update*。
 - 新端点：`/api/choreo` 与 `/api/nisar_product`。
 
 ## 架构
@@ -83,24 +86,29 @@ docker build -t fire-mok . && docker run -p 8000:8000 -v "$PWD/data:/app/data" f
 - `pipeline/scripts/update_latest.py` 获取 AOI 上最新的 Sentinel-1 RTC
   影像，基于同一轨道的前一景构建淹没范围，并应用上下文掩膜
   （`--dry-run` 显示处理计划）。
+- 若 14 天窗口内没有全覆盖影像对且工作区为空（全新 CI）：会用 30 天
+  窗口重建参考淹没范围，确保 C×L 二重奏始终有 C 波段对照。
 - GitHub Actions **每天 09:00（巴西利亚时间）** 运行该流程
   （`update-data.yml`），并将新的淹没范围发布为 artifact。
 - 前瞻式降雨：风险指数取**两者较大值**——过去 7 天的实测降雨与
   Open-Meteo 未来 7 天的**预报**降雨。
 
-## NISAR（NASA–ISRO，L 波段）— 已集成
+## NISAR（NASA–ISRO，L 波段）— 已上线
 
 NISAR 已接入监测流水线（`pipeline/scripts/build_nisar.py`）：
 
 - **始终**：对 AOI 进行匿名 ASF 搜索 → `/api/nisar` 公开场景目录（过去一年
   Guaíba AOI 上空有 60 景 GCOV；CI 每日运行）。
 - **使用免费 Earthdata 登录后**（`EARTHDATA_USER`/`EARTHDATA_PASS` 或
-  netrc）：下载最新的 GCOV 分块，转换 HDF5 → COG（dB），并在每个行动计划中
-  发布 L 波段开阔水域代理指标（`/api/plan/{code}` 的 `nisar` 块）。没有凭据
-  时脚本记录 `inventory-only` 并正常退出。
+  netrc）：下载最新的 GCOV 分块，转换 HDF5 → COG（dB），生成 AOI 窗口的
+  dB 图、开阔水域代理图层，以及对照最新 Sentinel-1 淹没范围的 **C×L
+  二重奏差异图**——全部发布在 `/api/nisar_product` 和每个行动计划中
+  （`/api/plan/{code}` 的 `nisar` 块）。凭据缺失**或被拒**（例如 EDL 资料
+  不完整）时回退到 `inventory-only`：运行保持绿色，每日监测永不阻塞。
 
-NISAR（L 波段）与 Sentinel-1（C 波段）分别保存在**不同图层**——
-不可用差值法对比。
+L 波段与 C 波段分别保存在**不同图层**；**C×L 二重奏**在各自标注日期上
+比较两者的水体掩膜（3 类：仅 C / 仅 L）——绝不做原始 dB 差值。
+
 ## 验证
 
 - SAR 淹没范围与 Sentinel-2 NDWI（经 SCL 掩膜）在**分层抽样切片**上

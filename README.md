@@ -1,6 +1,6 @@
 # Fire Mok
 
-**English** | [Português](README.pt-BR.md) | [Español](README.es.md) | [Français](README.fr.md) | [中文](README.zh-CN.md) | [Русский](README.ru.md)
+**English** | [Português](README.pt-BR.md) | [Español](README.es.md) | [Français](README.fr.md) | [中文](README.zh-CN.md) | [Русский](README.ru.md) | [العربية](README.ar.md)
 
 [![CI](https://github.com/Wincarf/fire-mok/actions/workflows/ci.yml/badge.svg)](https://github.com/Wincarf/fire-mok/actions/workflows/ci.yml)
 [![monitoring](https://github.com/Wincarf/fire-mok/actions/workflows/update-data.yml/badge.svg)](https://github.com/Wincarf/fire-mok/actions/workflows/update-data.yml)
@@ -19,7 +19,8 @@ municipal risk index with an action plan traceable to the data.
 
 Full app, no backend — the [`gh-pages`](https://github.com/Wincarf/fire-mok/tree/gh-pages)
 branch serves the risk choropleth, the real SAR extent of the May 11, 2024
-flood, before/after compare, guided story and municipal panels. API
+flood, before/after compare, guided story, municipal panels and the three
+NISAR L-band layers (backscatter, open water, C×L duet). API
 endpoints are mirrored as files (`/api/municipalities`, `/api/layers`,
 `/api/plan/{code}`, pre-rendered tiles z6–12).
 
@@ -40,9 +41,12 @@ endpoints are mirrored as files (`/api/municipalities`, `/api/layers`,
   WhatsApp-ready alert card (copy & paste). Every line is backed by real
   data; lines with no source (e.g. OSM schools/hospitals when Overpass is
   unreachable) are simply omitted — never mocked.
-- **NISAR duet** — a C×L split mode and three L-band layers are wired into
-  the UI and unlock automatically once the first L-band product exists
-  (free Earthdata login → repo secrets → run *monitoring update*).
+- **NISAR duet** — the C×L split mode and the three L-band layers
+  (backscatter, open water, duet) are **live**: the first L-band product
+  (GCOV granule of Nov 1, 2026) was built by the daily workflow and
+  deployed to gh-pages. Reproduce with: free Earthdata login with the
+  required profile fields (Study Area) + ASF app authorization → repo
+  secrets → run *monitoring update*.
 - New endpoints: `/api/choreo` and `/api/nisar_product`.
 
 ## Architecture
@@ -85,12 +89,15 @@ Public sources only — no Earthdata credentials needed.
 - `pipeline/scripts/update_latest.py` fetches the latest Sentinel-1 RTC
   scene over the AOI, builds the extent against the previous scene of the
   same pass and applies the context masks (`--dry-run` prints the plan).
+- No full-coverage pair in the 14-day window with an empty workspace
+  (fresh CI)? It rebuilds the reference extent from a 30-day lookback, so
+  the C×L duet always has a C-band counterpart.
 - GitHub Actions runs it **daily at 09:00 Brasília time**
   (`update-data.yml`) and publishes the new extent as an artifact.
 - Forward-looking rain: the risk index uses the **larger** of the last 7
   days' observed rain and the 7-day Open-Meteo **forecast**.
 
-## NISAR (NASA–ISRO, L-band) — integrated
+## NISAR (NASA–ISRO, L-band) — live
 
 NISAR is wired into the monitoring pipeline (`pipeline/scripts/build_nisar.py`):
 
@@ -99,12 +106,17 @@ NISAR is wired into the monitoring pipeline (`pipeline/scripts/build_nisar.py`):
   daily in CI).
 - **With a free Earthdata login** (`EARTHDATA_USER`/`EARTHDATA_PASS` or
   netrc): downloads the newest GCOV granule, converts HDF5 → COG (dB) and
-  publishes the L-band open-water proxy stats on every action plan
-  (`nisar` block in `/api/plan/{code}`). Without credentials the script
-  logs `inventory-only` and exits successfully.
+  builds the AOI-window dB, the open-water proxy and the **C×L duet diff**
+  against the latest Sentinel-1 extent — published in `/api/nisar_product`
+  and on every action plan (`nisar` block in `/api/plan/{code}`). Missing
+  or refused credentials (e.g. an incomplete EDL profile) fall back to
+  `inventory-only`: the run stays green and daily monitoring never
+  blocks.
 
-NISAR (L-band) and Sentinel-1 (C-band) live in **separate layers** — not
-comparable by difference.
+L-band and C-band stay in **separate layers**; the **C×L duet** compares
+their water masks (3 classes: C-only / L-only) on labeled dates — never a
+raw dB difference.
+
 ## Validation
 
 - SAR extent validated against Sentinel-2 NDWI (SCL-masked) on **stratified

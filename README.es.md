@@ -1,6 +1,6 @@
 # Fire Mok
 
-[English](README.md) | [Português](README.pt-BR.md) | **Español** | [Français](README.fr.md) | [中文](README.zh-CN.md) | [Русский](README.ru.md)
+[English](README.md) | [Português](README.pt-BR.md) | **Español** | [Français](README.fr.md) | [中文](README.zh-CN.md) | [Русский](README.ru.md) | [العربية](README.ar.md)
 
 [![CI](https://github.com/Wincarf/fire-mok/actions/workflows/ci.yml/badge.svg)](https://github.com/Wincarf/fire-mok/actions/workflows/ci.yml)
 [![monitoring](https://github.com/Wincarf/fire-mok/actions/workflows/update-data.yml/badge.svg)](https://github.com/Wincarf/fire-mok/actions/workflows/update-data.yml)
@@ -20,8 +20,9 @@ acción rastreable hasta los datos.
 
 App completa, sin backend — la rama [`gh-pages`](https://github.com/Wincarf/fire-mok/tree/gh-pages)
 sirve coropletas de riesgo, la extensión SAR real de la inundación del
-11/05/2024, comparación antes/después, historia guiada y paneles
-municipales. Los endpoints de la API se reflejan como archivos
+11/05/2024, comparación antes/después, historia guiada, paneles
+municipales y las tres capas NISAR de banda L (retrodispersión, agua
+abierta, dueto C×L). Los endpoints de la API se reflejan como archivos
 (`/api/municipalities`, `/api/layers`, `/api/plan/{code}`, teselas
 pregeneradas z6–12).
 
@@ -44,10 +45,13 @@ pregeneradas z6–12).
   proviene de datos reales; las líneas sin fuente (p. ej., escuelas y
   hospitales de OSM cuando Overpass no está accesible) simplemente se
   omiten — nunca se inventan.
-- **Duet NISAR** — el modo dividido C×L y tres capas de banda L ya están
-  en la app y aparecen solos cuando exista el primer producto banda L
-  (cuenta Earthdata gratuita → secrets del repositorio → ejecutar
-  *monitoring update*).
+- **Duet NISAR** — el modo dividido C×L y las tres capas de banda L
+  (retrodispersión, agua abierta, dueto) ya están **en vivo**: el primer
+  producto banda L (gránulo GCOV del 01/11/2026) fue generado por el
+  workflow diario y publicado en gh-pages. Para reproducirlo: cuenta
+  Earthdata gratuita con los campos de perfil obligatorios (Study Area) +
+  autorización de la app ASF → secrets del repositorio → ejecutar
+  *monitoring update*.
 - Nuevos endpoints: `/api/choreo` y `/api/nisar_product`.
 
 ## Arquitectura
@@ -91,13 +95,17 @@ Solo fuentes públicas — sin credenciales de Earthdata.
   reciente sobre el AOI, construye la extensión contra la escena anterior
   del mismo pase y aplica las máscaras de contexto (`--dry-run` muestra el
   plan).
+- ¿Sin par de cobertura completa en la ventana de 14 días y con el espacio
+  de trabajo vacío (CI nuevo)? Reconstruye la extensión de referencia con
+  una ventana de 30 días, para que el dueto C×L siempre tenga una
+  contraparte banda C.
 - GitHub Actions lo ejecuta **a diario a las 09:00 (hora de Brasilia)**
   (`update-data.yml`) y publica la nueva extensión como artifact.
 - Lluvia con vista al futuro: el índice usa la **mayor** entre la lluvia
   observada en los últimos 7 días y el **pronóstico** Open-Meteo de los
   próximos 7 días.
 
-## NISAR (NASA–ISRO, banda L) — integrado
+## NISAR (NASA–ISRO, banda L) — en vivo
 
 NISAR está integrado en el pipeline de monitoreo (`pipeline/scripts/build_nisar.py`):
 
@@ -106,12 +114,17 @@ NISAR está integrado en el pipeline de monitoreo (`pipeline/scripts/build_nisar
   año; corre a diario en CI).
 - **Con una cuenta Earthdata gratuita** (`EARTHDATA_USER`/`EARTHDATA_PASS`
   o netrc): descarga el gránulo GCOV más reciente, convierte HDF5 → COG
-  (dB) y publica el proxy de agua abierta banda L en los planes de acción
-  (bloque `nisar` en `/api/plan/{code}`). Sin credenciales, el script
-  registra `inventory-only` y termina con éxito.
+  (dB) y genera el dB de la ventana del AOI, el proxy de agua abierta y el
+  **diff del dueto C×L** contra la extensión Sentinel-1 más reciente — todo
+  publicado en `/api/nisar_product` y en cada plan de acción (bloque
+  `nisar` en `/api/plan/{code}`). Credenciales ausentes **o rechazadas**
+  (p. ej., un perfil EDL incompleto) caen a `inventory-only`: el run sigue
+  en verde y el monitoreo diario nunca se bloquea.
 
-NISAR (banda L) y Sentinel-1 (banda C) viven en **capas separadas** — no
-comparables por diferencia.
+Banda L y banda C viven en **capas separadas**; el **dueto C×L** compara
+sus máscaras de agua (3 clases: solo C / solo L) en fechas rotuladas —
+nunca una diferencia bruta de dB.
+
 ## Validación
 
 - Extensión SAR validada contra Sentinel-2 NDWI (máscara SCL) en **chips
