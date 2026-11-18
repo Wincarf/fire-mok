@@ -165,7 +165,10 @@ export default function App() {
         setTiler("online");
         setTilerMs(Math.round(performance.now() - t0));
       })
-      .catch(() => setTiler("offline"));
+      .catch((err) => {
+        console.warn("tiler probe failed:", err);
+        setTiler("offline");
+      });
   }, []);
 
   useEffect(() => {

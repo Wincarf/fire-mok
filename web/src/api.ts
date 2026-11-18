@@ -80,7 +80,10 @@ export const floodPolygonsAvailable = async (): Promise<boolean> => {
 export async function downloadJson(url: string, filename: string) {
   try {
     const r = await fetch(withBase(url));
-    if (!r.ok) return;
+    if (!r.ok) {
+      console.warn(`export ${filename}: HTTP ${r.status}`);
+      return;
+    }
     const blob = await r.blob();
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
