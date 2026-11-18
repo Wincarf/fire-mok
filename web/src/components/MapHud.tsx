@@ -1,4 +1,4 @@
-import type { RefObject, ReactNode, PointerEvent } from "react";
+import type { RefObject, PointerEvent } from "react";
 import { RISK_CHIP, RISK_CATEGORIES } from "../risk";
 import { sarSceneDate } from "../format";
 import { SAR_SCENE_AFTER, SAR_SCENE_BEFORE } from "../mapStyle";
@@ -15,7 +15,6 @@ type Props = {
   onCompare: () => void;
   split: number;
   onDividerDown: (e: PointerEvent<HTMLDivElement>) => void;
-  children?: ReactNode;
 };
 
 export function MapHud({
@@ -29,7 +28,6 @@ export function MapHud({
   onCompare,
   split,
   onDividerDown,
-  children,
 }: Props) {
   return (
     <div
@@ -136,8 +134,6 @@ export function MapHud({
           </div>
         </div>
       )}
-
-      {children}
     </div>
   );
 }
