@@ -35,23 +35,19 @@ def density_from_counts(
 ) -> np.ndarray | None:
     """Count-preserving density (people per dst pixel) from a count raster.
 
-    Counts -> density (pop/m²) -> average-resample onto dst grid -> scale back
-    to per-pixel counts, so any resolution change keeps totals invariant.
+    GDAL's sum resample area-weights contributing source pixels, so totals
+    survive CRS and resolution changes — mixing transform units (deg² vs m²)
+    in a manual density conversion would corrupt them instead.
     Non-populated/nodata source cells are zero-filled (0 people — conservative
-    for exposure) instead of NaN, because GDAL's average ignores NaN without
-    area weighting and totals would inflate on coarser grids.
+    for exposure) instead of NaN, which sum resampling would propagate.
     """
-    src_px_area = abs(src_transform.a * src_transform.e)
-    dst_px_area = abs(dst_transform.a * dst_transform.e)
-    c = np.where(np.isnan(counts), 0.0, counts).astype("float32")
+    c = np.where(np.isnan(counts) | (counts < 0), 0.0, counts).astype("float32")
     if c.max() <= 0:
         return None
-    density_src = c / src_px_area
-    density_dst = reproject_to_grid(
-        density_src, src_transform, src_crs, dst_transform, dst_crs,
-        dst_shape, resampling=Resampling.average,
+    return reproject_to_grid(
+        c, src_transform, src_crs, dst_transform, dst_crs,
+        dst_shape, resampling=Resampling.sum,
     )
-    return density_dst * dst_px_area  # people per dst pixel
 
 
 def fetch_pop_density_grid(
