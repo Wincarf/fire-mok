@@ -1,5 +1,6 @@
 import type { Vis } from "../vis";
 import { SAR_PLATFORM } from "../format";
+import { RISK_CATEGORIES, RISK_CHIP, RISK_LABEL } from "../risk";
 
 type Props = {
   layers: Vis;
@@ -12,13 +13,6 @@ const LAYERS: { key: keyof Vis; name: string; chip: string; dot: string }[] = [
   { key: "muni", name: "Municipalities by risk", chip: "IBGE", dot: "bg-error" },
   { key: "flood", name: "Water where it shouldn't be", chip: "SAR", dot: "bg-primary" },
   { key: "sus", name: "Naturally flood-prone areas", chip: "DEM", dot: "bg-tertiary-container" },
-];
-
-const RISK = [
-  { label: "critical", cls: "bg-[#ef4444]" },
-  { label: "high", cls: "bg-[#f97316]" },
-  { label: "moderate", cls: "bg-[#facc15]" },
-  { label: "low", cls: "bg-[#94a3b8]" },
 ];
 
 export function LayersDrawer({ layers, onToggle, summary, lastPass }: Props) {
@@ -60,10 +54,10 @@ export function LayersDrawer({ layers, onToggle, summary, lastPass }: Props) {
             Municipal risk
           </span>
           <div className="mt-space-xs grid grid-cols-2 gap-space-xs">
-            {RISK.map((r) => (
-              <span key={r.label} className="flex items-center gap-space-xs font-label-mono-xs text-label-mono-xs text-on-surface-variant">
-                <i className={`w-2.5 h-2.5 rounded-sm ${r.cls}`} />
-                {r.label}
+            {RISK_CATEGORIES.map((r) => (
+              <span key={r} className="flex items-center gap-space-xs font-label-mono-xs text-label-mono-xs text-on-surface-variant">
+                <i className={`w-2.5 h-2.5 rounded-sm ${RISK_CHIP[r]}`} />
+                {RISK_LABEL[r]}
               </span>
             ))}
           </div>

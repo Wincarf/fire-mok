@@ -1,5 +1,5 @@
 import type { RefObject, ReactNode, PointerEvent } from "react";
-import { RISK_LABEL } from "../labels";
+import { RISK_CHIP, RISK_LABEL, RISK_CATEGORIES } from "../risk";
 import type { RiskCounts } from "../stats";
 
 type Props = {
@@ -14,13 +14,6 @@ type Props = {
   split: number;
   onDividerDown: (e: PointerEvent<HTMLDivElement>) => void;
   children?: ReactNode;
-};
-
-const CHIP: Record<keyof RiskCounts, string> = {
-  critical: "bg-[#ef4444]",
-  high: "bg-[#f97316]",
-  moderate: "bg-[#facc15]",
-  low: "bg-[#94a3b8]",
 };
 
 export function MapHud({
@@ -52,11 +45,11 @@ export function MapHud({
       <div className="absolute top-space-md left-space-md z-20 flex items-center gap-space-sm pointer-events-none">
         <div className="px-space-md py-space-xs rounded bg-surface-container-lowest/90 backdrop-blur-md border border-outline-variant flex items-center gap-space-md">
           <span className="font-label-mono-xs text-label-mono-xs text-on-surface font-semibold tracking-wider">
-            RISCO MUNICIPAL
+            MUNICIPAL RISK
           </span>
-          {(Object.keys(CHIP) as (keyof RiskCounts)[]).map((k) => (
+          {RISK_CATEGORIES.map((k) => (
             <span key={k} className="flex items-center gap-1.5 font-label-mono-xs text-label-mono-xs">
-              <span className={`w-2.5 h-2.5 rounded-sm ${CHIP[k]}`} />
+              <span className={`w-2.5 h-2.5 rounded-sm ${RISK_CHIP[k]}`} />
               <span className="text-on-surface-variant">{RISK_LABEL[k]}</span>
               <span className="text-primary font-medium">{counts[k]}</span>
             </span>

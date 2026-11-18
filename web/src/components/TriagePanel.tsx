@@ -1,21 +1,13 @@
-import { RISK_LABEL } from "../labels";
+import { RISK_LABEL, RISK_BADGE, isRiskCategory } from "../risk";
+import type { MuniProps, Plan } from "../api";
 import { riskScore10, fmtInt, fmtPct } from "../format";
 
-type Plan = { priority: string; reasons: string[]; actions: string[] };
-
 type Props = {
-  sel: Record<string, any>;
+  sel: MuniProps;
   plan: Plan | null;
   floodOk: boolean;
   onClose: () => void;
   onExportFlood: () => void;
-};
-
-const LEVEL_STYLE: Record<string, string> = {
-  critical: "bg-error-container/40 text-error border-error/50",
-  high: "bg-[#f59e0b]/15 text-[#fbbf24] border-[#f59e0b]/40",
-  moderate: "bg-[#eab308]/15 text-[#fde047] border-[#eab308]/40",
-  low: "bg-[#10b981]/15 text-[#6ee7b7] border-[#10b981]/40",
 };
 
 function Kpi({ label, value, sub, accent }: { label: string; value: string; sub?: string; accent?: string }) {
@@ -44,7 +36,7 @@ function Row({ label, value }: { label: string; value: string }) {
 }
 
 export function TriagePanel({ sel, plan, floodOk, onClose, onExportFlood }: Props) {
-  const cat = sel.risk_category as string;
+  const cat = isRiskCategory(sel.risk_category) ? sel.risk_category : null;
   const exposurePct =
     Number.isFinite(sel.pop_exposed) && Number.isFinite(sel.population) && sel.population > 0
       ? `${fmtPct(sel.pop_exposed / sel.population)} of the municipality`
@@ -72,10 +64,12 @@ export function TriagePanel({ sel, plan, floodOk, onClose, onExportFlood }: Prop
           </h2>
           <span
             className={`px-space-sm py-0.5 rounded-full border font-label-mono-xs text-label-mono-xs font-semibold uppercase whitespace-nowrap ${
-              LEVEL_STYLE[cat] ?? "bg-surface-container text-on-surface-variant border-outline-variant"
+              cat
+                ? RISK_BADGE[cat]
+                : "bg-surface-container text-on-surface-variant border-outline-variant"
             }`}
           >
-            Level {RISK_LABEL[cat] ?? cat}
+            Level {cat ? RISK_LABEL[cat] : "unknown"}
           </span>
         </div>
       </div>
@@ -120,7 +114,7 @@ export function TriagePanel({ sel, plan, floodOk, onClose, onExportFlood }: Prop
               Risk factors
             </span>
             <span className="font-label-mono-xs text-label-mono-xs text-primary font-medium uppercase">
-              Priority {RISK_LABEL[plan.priority] ?? plan.priority}
+              Priority {isRiskCategory(plan.priority) ? RISK_LABEL[plan.priority] : plan.priority}
             </span>
           </div>
           <ul className="rounded-lg bg-surface-container-low p-space-sm space-y-space-xs">
@@ -133,7 +127,7 @@ export function TriagePanel({ sel, plan, floodOk, onClose, onExportFlood }: Prop
           </ul>
 
           <div
-            id="acoes"
+            id="actions"
             className="font-label-mono-xs text-label-mono-xs text-on-surface-variant uppercase tracking-wider mt-space-md mb-space-xs"
           >
             Action guidelines
@@ -154,7 +148,7 @@ export function TriagePanel({ sel, plan, floodOk, onClose, onExportFlood }: Prop
       <div className="p-space-md border-t border-outline-variant flex flex-col gap-space-xs">
         {plan && (
           <a
-            href="#acoes"
+            href="#actions"
             className="h-9 rounded-lg bg-primary hover:bg-secondary-fixed text-on-primary flex items-center justify-center gap-space-xs font-body-sm text-body-sm font-medium transition-colors"
           >
             <span className="material-symbols-outlined text-[18px]">assignment</span>

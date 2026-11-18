@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { STORY } from "./story";
 import { summarizeMunicipalities } from "./stats";
-import { RISK_LABEL } from "./labels";
+import { RISK_LABEL } from "./risk";
 
 const VIS_KEYS = ["flood", "sus", "muni"];
 
