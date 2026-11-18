@@ -71,6 +71,41 @@ export const fetchPlan = async (code: string): Promise<Plan> => {
   return d;
 };
 
+export interface LayerEntry {
+  id: string;
+  available: boolean;
+}
+
+export interface ChoreoBeat {
+  date: string;
+  label: string;
+  flood_km2: number;
+  munis_affected: number;
+  pop_exposed_est: number;
+  municipalities: { name: string; flooded_m2: number; pop_exposed_est: number }[];
+  facilities?: { schools: number; hospitals: number } | null;
+}
+
+export interface Choreo {
+  beats: ChoreoBeat[];
+  [k: string]: unknown;
+}
+
+export const fetchChoreo = async (): Promise<Choreo | null> => {
+  const d = await getJson<unknown>("/api/choreo");
+  if (!d || typeof d !== "object" || !Array.isArray((d as Choreo).beats)) {
+    console.warn("/api/choreo: unexpected payload shape", d);
+    return null;
+  }
+  return d as Choreo;
+};
+
+// ids of raster layers the backend can actually tile — drives NISAR gating
+export const fetchAvailableLayers = async (): Promise<Set<string>> => {
+  const d = await getJson<{ layers?: LayerEntry[] }>("/api/layers");
+  return new Set((d?.layers ?? []).filter((e) => e.available).map((e) => e.id));
+};
+
 // rio-tiler health probe for the header status pill
 export const probeTiler = async (): Promise<boolean> => {
   try {

@@ -1,6 +1,6 @@
 # Fire Mok
 
-[English](README.md) | **Português** | [Español](README.es.md) | [Français](README.fr.md) | [中文](README.zh-CN.md) | [Русский](README.ru.md)
+[English](README.md) | **Português** | [Español](README.es.md) | [Français](README.fr.md) | [中文](README.zh-CN.md) | [Русский](README.ru.md) | [العربية](README.ar.md)
 
 [![CI](https://github.com/Wincarf/fire-mok/actions/workflows/ci.yml/badge.svg)](https://github.com/Wincarf/fire-mok/actions/workflows/ci.yml)
 [![monitoring](https://github.com/Wincarf/fire-mok/actions/workflows/update-data.yml/badge.svg)](https://github.com/Wincarf/fire-mok/actions/workflows/update-data.yml)
@@ -8,7 +8,7 @@
 
 Plataforma de monitoramento de enchentes para o Rio Grande do Sul.
 Caso âncora: enchente de maio/2024 na bacia do Guaíba — detectada em SAR
-Sentinel-1 (pronta para NISAR), cruzada com território (IBGE), clima
+Sentinel-1 (com NISAR GCOV integrado), cruzada com território (IBGE), clima
 (Open-Meteo + NASA POWER), terreno (Copernicus DEM + HAND) e população
 (WorldPop) num índice de risco municipal com plano de ação rastreável aos
 dados.
@@ -20,7 +20,8 @@ dados.
 
 App completo, sem backend — o branch [`gh-pages`](https://github.com/Wincarf/fire-mok/tree/gh-pages)
 serve o choropleth de risco, o extento SAR real da enchente de
-11/mai/2024, compare antes/depois, story guiado e painéis municipais. Os
+11/mai/2024, compare antes/depois, story guiado, painéis municipais e as três
+camadas NISAR de banda L (backscatter, água aberta, dueto C×L). Os
 endpoints da API são espelhados em arquivos (`/api/municipalities`,
 `/api/layers`, `/api/plan/{code}`, tiles pré-renderizados z6–12).
 
@@ -29,6 +30,26 @@ endpoints da API são espelhados em arquivos (`/api/municipalities`,
 - Regenerar: `cd web && npm run build -- --base=/fire-mok/` e depois
   `cd pipeline && uv run python ../scripts/build_pages.py --dist ../web/dist
   --out ../pages_site --data ../data` (dados em `data/` precisam existir).
+
+## A Dança e o card de segunda-feira (novos)
+
+- **A Dança** — três batidas reais do Sentinel-1 sobre a enchente de
+  maio/2024, em um slider de tempo com play: **pico 11/mai (203,7 km²,
+  ~70,8 mil pessoas expostas) → recessão 30/mai (47,6 km²) → calma 4/jun
+  (0 km²)**. Gerada por `pipeline/scripts/build_choreo.py` (leituras RTC
+  do Planetary Computer em grid comum, limpeza WorldCover, exposição areal
+  por município).
+- **Card de segunda-feira** — um clique transforma a batida escolhida em um
+  alerta pt-BR pronto para WhatsApp (copiar e colar). Toda linha vem de
+  dados reais; linha sem fonte (ex.: escolas/hospitais do OSM quando o
+  Overpass está inacessível) simplesmente não aparece — nunca inventada.
+- **Duet NISAR** — o modo dividido C×L e as três camadas de banda L
+  (backscatter, água aberta, dueto) já estão **no ar**: o primeiro produto
+  banda L (granule GCOV de 1/nov/2026) foi gerado pelo workflow diário e
+  publicado no gh-pages. Para reproduzir: login Earthdata gratuito com os
+  campos de perfil obrigatórios (Study Area) + autorização do app ASF →
+  secrets do repositório → rodar *monitoring update*.
+- Novos endpoints: `/api/choreo` e `/api/nisar_product`.
 
 ## Arquitetura
 
@@ -70,21 +91,34 @@ Só fontes públicas — sem credenciais Earthdata.
 - `pipeline/scripts/update_latest.py` busca a cena Sentinel-1 RTC mais
   recente sobre o AOI, constrói o extento contra a cena anterior do mesmo
   passe e aplica as máscaras de contexto (`--dry-run` mostra o plano).
+- Sem par de cobertura completa na janela de 14 dias e workspace vazio
+  (CI novo)? Ele reconstrói o extento de referência com uma janela de 30
+  dias, para que o dueto C×L sempre tenha uma contraparte banda C.
 - GitHub Actions roda **diariamente às 09h (horário de Brasília)**
   (`update-data.yml`) e publica o extento novo como artifact.
 - Chuva olhando pra frente: o índice usa o **maior** entre a chuva
   observada nos últimos 7 dias e a **previsão** Open-Meteo dos próximos 7
   dias.
 
-## NISAR (faixa de validação da missão)
+## NISAR (NASA–ISRO, banda L) — no ar
 
-`pipeline/scripts/validate_nisar.py` baixa uma cena NISAR GCOV via ASF
-DAAC e converte HDF5 -> COG.
+O NISAR está plugado no pipeline de monitoramento (`pipeline/scripts/build_nisar.py`):
 
-- Requer `EARTHDATA_USER`/`EARTHDATA_PASS`; sem credenciais, o
-  script loga `skipped: no Earthdata creds` e sai com sucesso.
-- NISAR (banda L) e Sentinel-1 (banda C) ficam em **camadas separadas** —
-  não comparáveis por diferença.
+- **Sempre**: busca ASF anônima sobre o AOI → inventário público de cenas em
+  `/api/nisar` (60 cenas GCOV sobre o AOI Guaíba no último ano; roda
+  diariamente no CI).
+- **Com login Earthdata gratuito** (`EARTHDATA_USER`/`EARTHDATA_PASS` ou
+  netrc): baixa o granule GCOV mais recente, converte HDF5 → COG (dB) e
+  gera o dB da janela do AOI, o proxy de água aberta e o **diff do dueto
+  C×L** contra o extento Sentinel-1 mais recente — tudo publicado em
+  `/api/nisar_product` e nos planos de ação (bloco `nisar` em
+  `/api/plan/{code}`). Credenciais ausentes **ou recusadas** (ex.: perfil
+  EDL incompleto) caem para `inventory-only`: o run fica verde e o
+  monitoramento diário nunca bloqueia.
+
+Banda L e banda C ficam em **camadas separadas**; o **dueto C×L** compara
+as máscaras de água (3 classes: só C / só L) em datas rotuladas — nunca
+uma diferença bruta de dB.
 
 ## Validação
 
@@ -99,7 +133,7 @@ DAAC e converte HDF5 -> COG.
 - Falsos positivos documentados (urbano, água permanente) são **cortados
   do extento** com ESA WorldCover 10 m (classes built-up e permanent
   water).
-- `cd pipeline && uv run pytest tests/` — 87 testes; `api/tests/` 9;
+- `cd pipeline && uv run pytest tests/` — 95 testes; `api/tests/` 12;
   `web/` 20 (vitest). CI roda os três no GitHub Actions.
 
 ## Licença

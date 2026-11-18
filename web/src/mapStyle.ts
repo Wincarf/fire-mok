@@ -28,6 +28,15 @@ const FLOOD_CMAP = encodeURIComponent(
 const SUS_CMAP = encodeURIComponent(
   JSON.stringify({ 0: [0, 0, 0, 0], 1: [37, 99, 235, 140] })
 );
+const CHOREO_CMAP = encodeURIComponent(
+  JSON.stringify({ 0: [0, 0, 0, 0], 1: [37, 99, 235, 150] })
+);
+const NISAR_WATER_CMAP = encodeURIComponent(
+  JSON.stringify({ 0: [0, 0, 0, 0], 1: [34, 211, 238, 170] })
+);
+const DIFF_CMAP = encodeURIComponent(
+  JSON.stringify({ 0: [0, 0, 0, 0], 1: [220, 38, 38, 160], 2: [34, 211, 238, 190] })
+);
 const GRAY = "rescale=-30,0";
 const show = (on: boolean): "visible" | "none" => (on ? "visible" : "none");
 
@@ -62,7 +71,7 @@ export function feedMuni(m: MapLibreMap, fc: MuniFC | null) {
   }
 }
 
-export function applyVis(m: MapLibreMap, l: Vis) {
+export function applyVis(m: MapLibreMap, l: Vis, freezeNisar = false) {
   // only set when different — styledata refires on setLayoutProperty and
   // would loop forever if we re-set the same value
   const v = (id: string, on: boolean) => {
@@ -72,12 +81,56 @@ export function applyVis(m: MapLibreMap, l: Vis) {
   };
   v("flood", l.flood);
   v("sus", l.sus);
+  if (!freezeNisar) { // duet right map owns its NISAR visibility (style-defined)
+    v("nisar-hh", !!l.nisarHh);
+    v("nisar-water", !!l.nisarWater);
+    v("nisar-diff", !!l.nisarDiff);
+  }
   v("muni-fill", l.muni);
   v("muni-line", l.muni);
 }
 
-// mode "risk" = basemap + choropleth only; "before"/"after" add the SAR scene
-export function styleFor(vis: Vis, mode: "risk" | "before" | "after"): StyleSpecification {
+/** the dance: exactly one choreo beat layer visible at a time. Layer ids are
+ * choreo-<beat.label> (peak/recession/calm) — indexed ids would never match. */
+export function applyChoreo(
+  m: MapLibreMap | null,
+  b: number | null,
+  beats: readonly { label: string }[]
+) {
+  if (!m) return;
+  beats.forEach((beat, i) => {
+    const id = `choreo-${beat.label}`;
+    const want = show(b === i);
+    if (m.getLayer(id) && m.getLayoutProperty(id, "visibility") !== want)
+      m.setLayoutProperty(id, "visibility", want);
+  });
+}
+
+/** NISAR sources+layers are added imperatively once /api/layers reports the
+ * product built (styleFor can't know availability at construction time). */
+export function addNisarLayers(m: MapLibreMap, l: Vis): boolean {
+  if (m.getSource("nisar-hh")) return false;
+  const raster = (tiles: string[]) => ({ type: "raster", tiles, tileSize: 256 }) as const;
+  m.addSource("nisar-hh", raster([withBase(`/tiles/nisar_hh/{z}/{x}/{y}.png?${GRAY}`)]));
+  m.addSource("nisar-water", raster([withBase(`/tiles/nisar_lwater/{z}/{x}/{y}.png?colormap=${NISAR_WATER_CMAP}`)]));
+  m.addSource("nisar-diff", raster([withBase(`/tiles/nisar_diff/{z}/{x}/{y}.png?colormap=${DIFF_CMAP}`)]));
+  const before = "muni-fill";
+  m.addLayer({ id: "nisar-hh", type: "raster", source: "nisar-hh", layout: { visibility: show(!!l.nisarHh) } } as never, before);
+  m.addLayer({ id: "nisar-water", type: "raster", source: "nisar-water", layout: { visibility: show(!!l.nisarWater) } } as never, before);
+  m.addLayer({ id: "nisar-diff", type: "raster", source: "nisar-diff", layout: { visibility: show(!!l.nisarDiff) } } as never, before);
+  return true;
+}
+
+// mode "risk" = basemap + choropleth only; "before"/"after" add the SAR scene;
+// "nisar" (duet right pane) adds the NISAR L-band scene + open-water proxy
+export function styleFor(vis: Vis, mode: "risk" | "before" | "after" | "nisar"): StyleSpecification {
+  const choreoSrc = (layer: string) => ({
+    type: "raster" as const,
+    tiles: [withBase(`/tiles/${layer}/{z}/{x}/{y}.png?colormap=${CHOREO_CMAP}`)],
+    tileSize: 256,
+  });
+  const choreoLayer = (id: string) =>
+    ({ id, type: "raster", source: id, layout: { visibility: "none" } }) as const;
   const s: StyleSpecification = {
     version: 8,
     sources: {
@@ -97,6 +150,9 @@ export function styleFor(vis: Vis, mode: "risk" | "before" | "after"): StyleSpec
         tiles: [withBase(`/tiles/susceptibility/{z}/{x}/{y}.png?colormap=${SUS_CMAP}`)],
         tileSize: 256,
       },
+      "choreo-peak": choreoSrc("choreo_peak"),
+      "choreo-recession": choreoSrc("choreo_recession"),
+      "choreo-calm": choreoSrc("choreo_calm"),
       muni: { type: "geojson", data: EMPTY_FC },
     },
     layers: [
@@ -113,6 +169,9 @@ export function styleFor(vis: Vis, mode: "risk" | "before" | "after"): StyleSpec
         source: "flood",
         layout: { visibility: show(vis.flood) },
       },
+      choreoLayer("choreo-peak"),
+      choreoLayer("choreo-recession"),
+      choreoLayer("choreo-calm"),
       {
         id: "muni-fill",
         type: "fill",
@@ -144,7 +203,25 @@ export function styleFor(vis: Vis, mode: "risk" | "before" | "after"): StyleSpec
       },
     ],
   };
-  if (mode !== "risk") {
+  if (mode === "nisar") {
+    s.sources["nisar-hh"] = {
+      type: "raster",
+      tiles: [withBase(`/tiles/nisar_hh/{z}/{x}/{y}.png?${GRAY}`)],
+      tileSize: 256,
+    };
+    s.sources["nisar-water"] = {
+      type: "raster",
+      tiles: [withBase(`/tiles/nisar_lwater/{z}/{x}/{y}.png?colormap=${NISAR_WATER_CMAP}`)],
+      tileSize: 256,
+    };
+    s.layers.splice(
+      1,
+      0,
+      { id: "nisar-hh", type: "raster", source: "nisar-hh" },
+      { id: "nisar-water", type: "raster", source: "nisar-water" }
+    );
+  }
+  if (mode !== "risk" && mode !== "nisar") {
     s.sources.sar = {
       type: "raster",
       tiles: [
@@ -181,10 +258,18 @@ export function attachMuniInteractions(
  * re-apply the selection highlight. Register once per map. */
 export function bindMapData(
   m: MapLibreMap,
-  data: { munis: () => MuniFC | null; sel: () => string | null; vis: () => Vis }
+  data: {
+    munis: () => MuniFC | null;
+    sel: () => string | null;
+    vis: () => Vis;
+    choreo?: () => { beat: number | null; beats: readonly { label: string }[] };
+    freezeNisar?: boolean;
+  }
 ) {
   m.on("styledata", () => {
-    applyVis(m, data.vis());
+    applyVis(m, data.vis(), data.freezeNisar);
+    const c = data.choreo?.();
+    if (c) applyChoreo(m, c.beat, c.beats);
     feedMuni(m, data.munis());
     if (m.getLayer("muni-sel")) m.setFilter("muni-sel", selFilter(data.sel()));
   });

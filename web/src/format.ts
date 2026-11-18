@@ -31,3 +31,23 @@ export function fmtInt(v: number | undefined | null): string {
 export function fmtPct(frac: number | undefined | null): string {
   return typeof frac === "number" && Number.isFinite(frac) ? `${Math.round(frac * 100)}%` : "—";
 }
+
+const MONTHS_PT = [
+  "jan", "fev", "mar", "abr", "mai", "jun",
+  "jul", "ago", "set", "out", "nov", "dez",
+];
+
+/** ISO date (YYYY-MM-DD) → Brazilian "dd/mon/yyyy"; short drops the year. */
+export function ptDate(iso: string, short = false): string {
+  const [y, m, d] = iso.split("-");
+  const mo = MONTHS_PT[Number(m) - 1];
+  if (!y || !mo || !d) return iso;
+  return short ? `${d}/${mo}` : `${d}/${mo}/${y}`;
+}
+
+/** km² number → pt-BR string with 1 decimal; missing → em dash. */
+export function fmtKm2(v: number | undefined | null): string {
+  return typeof v === "number" && Number.isFinite(v)
+    ? v.toLocaleString("pt-BR", { maximumFractionDigits: 1 })
+    : "—";
+}

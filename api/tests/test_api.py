@@ -13,7 +13,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app import create_app
 
-LAYERS = ["sar_before", "sar_after", "flood_extent", "permanent_water", "urban", "susceptibility", "hand", "dem"]
+LAYERS = [
+    "sar_before", "sar_after", "flood_extent", "permanent_water", "urban",
+    "susceptibility", "hand", "dem",
+    "choreo_peak", "choreo_recession", "choreo_calm",
+    "nisar_hh", "nisar_lwater", "nisar_diff",
+]
 
 
 def _tiny_cog(path: Path, val: float):
@@ -32,6 +37,12 @@ TEST_LAYERS = {
     "flood_extent": "sar/f.tif", "permanent_water": "context/pw.tif",
     "urban": "context/urb.tif", "susceptibility": "terrain/s.tif",
     "hand": "terrain/h.tif", "dem": "terrain/d.tif",
+    "choreo_peak": "sar/choreo_extent_20240511.tif",
+    "choreo_recession": "sar/choreo_extent_20240530.tif",
+    "choreo_calm": "sar/choreo_extent_20240604.tif",
+    "nisar_hh": "nisar/nisar_hh_db.tif",
+    "nisar_lwater": "nisar/nisar_lwater.tif",
+    "nisar_diff": "nisar/nisar_diff.tif",
 }
 
 
@@ -51,6 +62,13 @@ def _make_client(tmp_path: Path, layers: dict | None = None):
     )
     (tmp_path / "vector" / "flood_polygons_may2024.geojson").write_text(
         json.dumps({"type": "FeatureCollection", "features": []}), encoding="utf-8"
+    )
+    (tmp_path / "vector" / "choreo.json").write_text(
+        json.dumps({"beats": [{"date": "2024-05-11", "label": "peak", "flood_km2": 10}]}),
+        encoding="utf-8",
+    )
+    (tmp_path / "vector" / "nisar_status.json").write_text(
+        json.dumps({"granule_id": "g1", "lband": {"pixels": 10}}), encoding="utf-8"
     )
     return TestClient(create_app(tmp_path, layers=rel))
 
@@ -156,3 +174,24 @@ def test_tile_colormap_string_keys(tmp_path):
     assert r.status_code == 200
     bands = _read_png(r.content)
     assert (bands[0] == 220).any()  # some pixel rendered red
+
+
+def test_choreo_endpoint(client):
+    r = client.get("/api/choreo")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["beats"][0]["date"] == "2024-05-11"
+
+
+def test_nisar_product_endpoint(client):
+    r = client.get("/api/nisar_product")
+    assert r.status_code == 200 and r.json()["granule_id"] == "g1"
+
+
+def test_choreo_and_product_404_when_missing(tmp_path):
+    from fastapi.testclient import TestClient
+
+    (tmp_path / "vector").mkdir(parents=True)
+    c = TestClient(create_app(tmp_path))
+    assert c.get("/api/choreo").status_code == 404
+    assert c.get("/api/nisar_product").status_code == 404

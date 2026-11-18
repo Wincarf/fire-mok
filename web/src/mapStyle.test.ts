@@ -13,7 +13,10 @@ const OFF = { flood: false, sus: false, muni: true };
 describe("styleFor", () => {
   it("risk mode has basemap + choropleth, no SAR source", () => {
     const s = styleFor(OFF, "risk");
-    expect(Object.keys(s.sources).sort()).toEqual(["flood", "muni", "osm", "sus"]);
+    expect(Object.keys(s.sources).sort()).toEqual([
+      "choreo-calm", "choreo-peak", "choreo-recession",
+      "flood", "muni", "osm", "sus",
+    ]);
     expect(s.layers.map((l) => l.id)).not.toContain("sar");
   });
 
@@ -25,6 +28,15 @@ describe("styleFor", () => {
 
     const a = styleFor(OFF, "after");
     expect((a.sources.sar as { tiles: string[] }).tiles[0]).toContain("/tiles/sar_after/");
+  });
+
+  it("nisar mode (duet right pane) adds L-band sources without the SAR scene", () => {
+    const s = styleFor(OFF, "nisar");
+    const ids = s.layers.map((l) => l.id);
+    expect(ids).toContain("nisar-hh");
+    expect(ids).toContain("nisar-water");
+    expect(ids).not.toContain("sar");
+    expect(s.sources["nisar-hh" as keyof typeof s.sources]).toBeTruthy();
   });
 
   it("visibility flags land on the matching raster layers", () => {

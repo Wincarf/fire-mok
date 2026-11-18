@@ -141,12 +141,32 @@ def main() -> int:
     (api / "layers").write_text(json.dumps({"layers": layers}))
     # /api/plan/{code} — one extensionless file per municipality
     plans_p = args.data / "vector" / "action_plans_may2024.json"
+    nisar_status_p = args.data / "vector" / "nisar_status.json"
+    nisar_block = (
+        json.loads(nisar_status_p.read_text(encoding="utf-8"))
+        if nisar_status_p.exists()
+        else None
+    )
     if plans_p.exists():
         plans = json.loads(plans_p.read_text(encoding="utf-8"))
         (api / "plan").mkdir()
         for code, body in plans.items():
+            if nisar_block is not None:  # same merge rule as api/app.py
+                body = {**body, "nisar": nisar_block}
             (api / "plan" / code).write_text(json.dumps(body, ensure_ascii=False))
         print(f"  api/plan/: {len(plans)} files")
+    nisar_inv = args.data / "vector" / "nisar_scenes.json"
+    if nisar_inv.exists():
+        shutil.copyfile(nisar_inv, api / "nisar")
+        print("  api/nisar: inventory")
+    choreo_p = args.data / "vector" / "choreo.json"
+    if choreo_p.exists():
+        shutil.copyfile(choreo_p, api / "choreo")
+        print("  api/choreo: dance beats")
+    nisar_prod = args.data / "vector" / "nisar_status.json"
+    if nisar_prod.exists():
+        shutil.copyfile(nisar_prod, api / "nisar_product")
+        print("  api/nisar_product: L-band status")
 
     # 3) pre-rendered tiles (manifest entries flagged prerender)
     total = 0

@@ -83,8 +83,18 @@ def main() -> int:
     scenes = search_s1_rtc(aoi.bbox, start.strftime("%Y-%m-%d"), end.strftime("%Y-%m-%d"))
     pair = choose_pair(scenes, aoi.bbox)
     if pair is None:
-        logger.info("up to date: no new full-coverage scene pair in the last %d days", args.lookback_days)
-        return 0
+        logger.info("no full-coverage pair in the last %d days", args.lookback_days)
+        if (DATA / "sar" / "flood_extent_latest.tif").exists():
+            logger.info("extent already on disk -> nothing to do")
+            return 0
+        # Fresh CI workspace: rebuild the reference extent from a wider
+        # window so the NISAR duet always has a C-band counterpart.
+        wide_start = (end - timedelta(days=30)).strftime("%Y-%m-%d")
+        pair = choose_pair(search_s1_rtc(aoi.bbox, wide_start, end.strftime("%Y-%m-%d")), aoi.bbox)
+        if pair is None:
+            logger.info("no pair even with a 30-day lookback -> nothing to build")
+            return 0
+        logger.info("rebuilding reference extent with a 30-day lookback")
     latest, baseline = pair
     logger.info("latest:   %s (%s)", latest.id, latest.datetime[:10])
     logger.info("baseline: %s (%s)", baseline.id, baseline.datetime[:10])

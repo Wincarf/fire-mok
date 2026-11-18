@@ -1,6 +1,6 @@
 # Fire Mok
 
-[English](README.md) | [Português](README.pt-BR.md) | [Español](README.es.md) | **Français** | [中文](README.zh-CN.md) | [Русский](README.ru.md)
+[English](README.md) | [Português](README.pt-BR.md) | [Español](README.es.md) | **Français** | [中文](README.zh-CN.md) | [Русский](README.ru.md) | [العربية](README.ar.md)
 
 [![CI](https://github.com/Wincarf/fire-mok/actions/workflows/ci.yml/badge.svg)](https://github.com/Wincarf/fire-mok/actions/workflows/ci.yml)
 [![monitoring](https://github.com/Wincarf/fire-mok/actions/workflows/update-data.yml/badge.svg)](https://github.com/Wincarf/fire-mok/actions/workflows/update-data.yml)
@@ -8,7 +8,7 @@
 
 Plateforme de surveillance des inondations pour le Rio Grande do Sul
 (Brésil). Cas d'ancrage : la crue de mai 2024 dans le bassin du Guaíba —
-détectée par SAR Sentinel-1 (prête pour NISAR), croisée avec le territoire
+détectée par SAR Sentinel-1 (avec NISAR GCOV intégré), croisée avec le territoire
 (IBGE), le climat (Open-Meteo + NASA POWER), le relief (Copernicus DEM +
 HAND) et la population (WorldPop) en un indice de risque municipal avec
 un plan d'action traçable jusqu'aux données.
@@ -20,8 +20,9 @@ un plan d'action traçable jusqu'aux données.
 
 Application complète, sans backend — la branche [`gh-pages`](https://github.com/Wincarf/fire-mok/tree/gh-pages)
 sert les choroplèthes de risque, l'emprise SAR réelle de la crue du
-11/05/2024, la comparaison avant/après, l'histoire guidée et les panneaux
-municipaux. Les endpoints de l'API sont reflétés en fichiers
+11/05/2024, la comparaison avant/après, l'histoire guidée, les panneaux
+municipaux et les trois couches NISAR bande L (rétrodiffusion, eau
+libre, duo C×L). Les endpoints de l'API sont reflétés en fichiers
 (`/api/municipalities`, `/api/layers`, `/api/plan/{code}`, tuiles
 pré-rendues z6–12).
 
@@ -31,6 +32,29 @@ pré-rendues z6–12).
   `cd pipeline && uv run python ../scripts/build_pages.py --dist ../web/dist
   --out ../pages_site --data ../data` (les données dans `data/` doivent
   exister).
+
+## La Danse et la carte du lundi (nouveau)
+
+- **La Danse** — trois temps réels de Sentinel-1 sur l'inondation de mai
+  2024, dans un curseur temporel avec lecture automatique : **pic 11/mai
+  (203,7 km², ~70,8 milliers de personnes exposées) → décrue 30/mai
+  (47,6 km²) → calme 4/juin (0 km²)**. Générée par
+  `pipeline/scripts/build_choreo.py` (lectures RTC de Planetary Computer
+  sur une grille commune, nettoyage WorldCover, exposition aréale par
+  municipalité).
+- **Carte du lundi** — un clic transforme le temps choisi en une alerte en
+  portugais prête pour WhatsApp (copier-coller). Chaque ligne s'appuie sur
+  des données réelles ; les lignes sans source (p. ex. écoles/hôpitaux OSM
+  quand Overpass est inaccessible) sont simplement omises — jamais
+  inventées.
+- **Duet NISAR** — le mode partagé C×L et les trois couches bande L
+  (rétrodiffusion, eau libre, duo) sont **en ligne** : le premier produit
+  bande L (granule GCOV du 01/11/2026) a été généré par le workflow
+  quotidien et publié sur gh-pages. Pour le reproduire : compte Earthdata
+  gratuit avec les champs de profil obligatoires (Study Area) +
+  autorisation de l'application ASF → secrets du dépôt → lancer
+  *monitoring update*.
+- Nouveaux endpoints : `/api/choreo` et `/api/nisar_product`.
 
 ## Architecture
 
@@ -73,21 +97,35 @@ Sources publiques uniquement — aucun identifiant Earthdata requis.
   plus récente sur l'AOI, construit l'emprise par rapport à la scène
   précédente du même passage et applique les masques de contexte
   (`--dry-run` affiche le plan).
+- Pas de paire à couverture complète dans la fenêtre de 14 jours et
+  espace de travail vide (CI neuf) ? Il reconstruit l'emprise de
+  référence avec une fenêtre de 30 jours, pour que le duo C×L ait toujours
+  une contrepartie bande C.
 - GitHub Actions l'exécute **chaque jour à 09 h (heure de Brasília)**
   (`update-data.yml`) et publie la nouvelle emprise comme artifact.
 - Pluie tournée vers l'avenir : l'indice retient la **plus grande** valeur
   entre la pluie observée sur 7 jours et la pluie **prévue** par
   Open-Meteo pour les 7 jours suivants.
 
-## NISAR (bande de validation de la mission)
+## NISAR (NASA–ISRO, bande L) — en ligne
 
-`pipeline/scripts/validate_nisar.py` télécharge une scène NISAR GCOV via
-ASF DAAC et convertit HDF5 -> COG.
+NISAR est branché sur le pipeline de suivi (`pipeline/scripts/build_nisar.py`) :
 
-- Requiert `EARTHDATA_USER`/`EARTHDATA_PASS` ; sans identifiants,
-  le script journalise `skipped: no Earthdata creds` et sort avec succès.
-- NISAR (bande L) et Sentinel-1 (bande C) restent dans des **couches
-  séparées** — non comparables par différence.
+- **Toujours** : recherche ASF anonyme sur l'AOI → inventaire public des
+  scènes sur `/api/nisar` (60 scènes GCOV sur l'AOI Guaíba l'an dernier ;
+  exécuté chaque jour dans le CI).
+- **Avec un compte Earthdata gratuit** (`EARTHDATA_USER`/`EARTHDATA_PASS`
+  ou netrc) : télécharge le granule GCOV le plus récent, convertit HDF5 →
+  COG (dB) et produit le dB de la fenêtre AOI, le proxy d'eau libre et le
+  **diff du duo C×L** contre la dernière emprise Sentinel-1 — le tout
+  publié dans `/api/nisar_product` et sur chaque plan d'action (bloc
+  `nisar` dans `/api/plan/{code}`). Des identifiants absents **ou
+  refusés** (p. ex. un profil EDL incomplet) basculent en `inventory-only` :
+  le run reste vert et la surveillance quotidienne ne bloque jamais.
+
+Bande L et bande C restent dans des **couches séparées** ; le **duo C×L**
+compare leurs masques d'eau (3 classes : C seul / L seul) à des dates
+étiquetées — jamais une différence brute de dB.
 
 ## Validation
 
@@ -103,7 +141,7 @@ ASF DAAC et convertit HDF5 -> COG.
 - Les faux positifs documentés (urbain, eau permanente) sont **retirés de
   l'emprise** avec ESA WorldCover 10 m (classes built-up et permanent
   water).
-- `cd pipeline && uv run pytest tests/` — 87 tests ; `api/tests/` 9 ;
+- `cd pipeline && uv run pytest tests/` — 95 tests ; `api/tests/` 12 ;
   `web/` 20 (vitest). La CI exécute les trois sur GitHub Actions.
 
 ## Licence

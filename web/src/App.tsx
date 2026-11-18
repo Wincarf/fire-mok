@@ -4,23 +4,29 @@ import type { Vis } from "./vis";
 import { STORY, type Step } from "./story";
 import { StoryOverlay } from "./components/StoryOverlay";
 import { Header } from "./components/Header";
+import { ChoreoBar } from "./components/ChoreoBar";
 import { LayersDrawer } from "./components/LayersDrawer";
 import { MapHud } from "./components/MapHud";
+import { MondayCard } from "./components/MondayCard";
 import { TriagePanel } from "./components/TriagePanel";
 import { Timeline } from "./components/Timeline";
 import { summarizeMunicipalities, countByCategory } from "./stats";
 import { sarSceneDate } from "./format";
 import {
   downloadJson,
+  fetchAvailableLayers,
+  fetchChoreo,
   fetchMunicipalities,
   fetchPlan,
   floodPolygonsAvailable,
-  probeTiler,
+  type Choreo,
   type MuniFC,
   type MuniFeature,
   type Plan,
 } from "./api";
 import {
+  addNisarLayers,
+  applyChoreo,
   applyVis,
   attachMuniInteractions,
   bindMapData,
@@ -46,7 +52,17 @@ export default function App() {
   const layersRef = useRef(layers);
   const selCodeRef = useRef(selCode);
   const muniFc = useRef<MuniFC | null>(null); // full FeatureCollection for maplibre sources
+  const beatRef = useRef<number | null>(null);
+  const choreoRef = useRef<Choreo | null>(null);
+  const danceMuted = useRef(false);
   const [compare, setCompare] = useState(false);
+  const [duet, setDuet] = useState(false);
+  const [nisarReady, setNisarReady] = useState(false);
+  const [avail, setAvail] = useState<Set<string>>(new Set());
+  const [choreo, setChoreo] = useState<Choreo | null>(null);
+  const [beat, setBeat] = useState<number | null>(null);
+  const [playing, setPlaying] = useState(false);
+  const [cardBeat, setCardBeat] = useState<number | null>(null);
   const [split, setSplit] = useState(50);
   const [step, setStep] = useState<number | null>(0);
   const [tiler, setTiler] = useState<"loading" | "online" | "offline">("loading");
@@ -63,6 +79,8 @@ export default function App() {
   // leaving story mode lands on the plain risk view
   const exitStory = () => {
     setStep(null);
+    setBeat(null);
+    setPlaying(false);
     setLayers({ flood: false, sus: false, muni: true });
   };
 
@@ -90,6 +108,7 @@ export default function App() {
       munis: () => muniFc.current,
       sel: () => selCodeRef.current,
       vis: () => layersRef.current,
+      choreo: () => ({ beat: beatRef.current, beats: choreoRef.current?.beats ?? [] }),
     });
 
     m.on("load", () => attachMuniInteractions(m, setSelCode));
@@ -116,7 +135,13 @@ export default function App() {
         console.warn("/api/municipalities failed:", err);
         setMunisFailed(true);
       });
-
+    fetchChoreo()
+      .then((d) => {
+        if (!d) return;
+        choreoRef.current = d;
+        setChoreo(d);
+      })
+      .catch((err) => console.warn("/api/choreo failed:", err));
     return () => {
       cancelAnimationFrame(coordRaf);
       delete (window as unknown as { __map?: maplibregl.Map }).__map;
@@ -124,17 +149,21 @@ export default function App() {
     };
   }, []);
 
-  // compare mode: second map (SAR recession) under the clipped "peak" view
-  const comparePrev = useRef(false);
+  // split mode: "sar" = recession vs peak; "duet" = Sentinel-1 C vs NISAR L
+  type SplitMode = "off" | "sar" | "duet";
+  const splitModePrev = useRef<SplitMode>("off");
+  const splitMode: SplitMode = compare ? "sar" : duet ? "duet" : "off";
   useEffect(() => {
     const m = map.current;
-    if (!m || compare === comparePrev.current) return; // skip the mount pass —
-    comparePrev.current = compare; // constructor style already matches "risk"
-    m.setStyle(styleFor(layersRef.current, compare ? "after" : "risk"));
-    if (!compare || !beforeRef.current) return;
+    if (!m || splitMode === splitModePrev.current) return; // skip the mount pass —
+    splitModePrev.current = splitMode; // constructor style already matches "risk"
+    m.setStyle(
+      styleFor(layersRef.current, splitMode === "off" ? "risk" : "after")
+    );
+    if (splitMode === "off" || !beforeRef.current) return;
     const m2 = new maplibregl.Map({
       container: beforeRef.current,
-      style: styleFor(layersRef.current, "before"),
+      style: styleFor(layersRef.current, splitMode === "sar" ? "before" : "nisar"),
       center: m.getCenter(),
       zoom: m.getZoom(),
       attributionControl: false,
@@ -147,6 +176,8 @@ export default function App() {
       munis: () => muniFc.current,
       sel: () => selCodeRef.current,
       vis: () => layersRef.current,
+      choreo: () => ({ beat: beatRef.current, beats: choreoRef.current?.beats ?? [] }),
+      freezeNisar: splitMode === "duet",
     });
     beforeMap.current = m2;
 
@@ -158,15 +189,50 @@ export default function App() {
       beforeMap.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [compare]);
+  }, [compare, duet]);
+
+  // NISAR layers join both maps only once the product shows up in /api/layers
+  useEffect(() => {
+    if (!avail.has("nisar_hh")) return;
+    let added = false;
+    for (const m of [map.current, beforeMap.current]) {
+      if (m && addNisarLayers(m, layersRef.current)) added = true;
+    }
+    if (added || (map.current && map.current.getSource("nisar-hh"))) setNisarReady(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [avail, compare, duet]);
+
+  // dance state: mute competing overlays once per dance session
+  useEffect(() => {
+    beatRef.current = beat;
+    if (beat !== null && !danceMuted.current) {
+      danceMuted.current = true;
+      setLayers((l) => ({ ...l, flood: false, sus: false }));
+    }
+    if (beat === null) danceMuted.current = false;
+    for (const m of [map.current, beforeMap.current])
+      if (m && m.isStyleLoaded())
+        applyChoreo(m, beat, choreoRef.current?.beats ?? []);
+  }, [beat]);
+
+  // play = loop the three beats
+  useEffect(() => {
+    if (!playing) return;
+    const n = choreoRef.current?.beats?.length ?? 3;
+    const t = setInterval(() => setBeat((b) => (b === null ? 0 : (b + 1) % n)), 1400);
+    return () => clearInterval(t);
+  }, [playing]);
 
   // rio-tiler health probe for the header status pill
   useEffect(() => {
     const t0 = performance.now();
-    probeTiler().then((ok) => {
-      setTiler(ok ? "online" : "offline");
-      if (ok) setTilerMs(Math.round(performance.now() - t0));
-    });
+    fetchAvailableLayers()
+      .then((a) => {
+        setTiler("online");
+        setTilerMs(Math.round(performance.now() - t0));
+        setAvail(a);
+      })
+      .catch(() => setTiler("offline"));
   }, []);
 
   useEffect(() => {
@@ -226,7 +292,11 @@ export default function App() {
         tilerMs={tilerMs}
         coords={coords}
         onExport={() => downloadJson("/api/municipalities", "municipal_risk_may2024.geojson")}
-        onStory={() => setStep(0)}
+        onStory={() => {
+          setBeat(null);
+          setPlaying(false);
+          setStep(0);
+        }}
       />
 
       <LayersDrawer
@@ -234,6 +304,7 @@ export default function App() {
         onToggle={(k, v) => setLayers((l) => ({ ...l, [k]: v }))}
         summary={summary}
         lastPass={sarSceneDate(SAR_SCENE_BEFORE)}
+        nisarReady={nisarReady}
       />
 
       <main className="pl-64 pt-16 h-full relative">
@@ -244,8 +315,22 @@ export default function App() {
           beforeRef={beforeRef}
           containerRef={wrap}
           counts={counts}
-          compare={compare}
-          onCompare={() => setCompare((c) => !c)}
+          compare={compare || duet}
+          onCompare={() => {
+            setCompare((c) => !c);
+            setDuet(false);
+          }}
+          showDuet={nisarReady}
+          duet={duet}
+          onDuet={() => {
+            setDuet((d) => !d);
+            setCompare(false);
+          }}
+          splitLabels={
+            duet
+              ? { left: "SENTINEL-1 C-BAND · 11/MAY/24", right: "NISAR L-BAND · OPEN WATER" }
+              : undefined
+          }
           split={split}
           onDividerDown={(e) => {
             e.preventDefault();
@@ -278,7 +363,20 @@ export default function App() {
             onExportFlood={() => downloadJson("/api/flood_polygons", "flooded_areas_may2024.geojson")}
           />
         )}
-        <Timeline step={step} onChapter={setStep} />
+        {step !== null && <Timeline step={step} onChapter={setStep} />}
+        {step === null && choreo && (
+          <ChoreoBar
+            beats={choreo.beats}
+            beat={beat}
+            playing={playing}
+            onBeat={(i) => setBeat(i === beat ? null : i)}
+            onPlay={() => setPlaying((p) => !p)}
+            onCard={(i) => setCardBeat(i)}
+          />
+        )}
+        {cardBeat !== null && choreo && (
+          <MondayCard beatData={choreo.beats[cardBeat]} onClose={() => setCardBeat(null)} />
+        )}
         {step !== null && (
           <StoryOverlay
             index={step}

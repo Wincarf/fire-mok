@@ -108,7 +108,32 @@ def create_app(data_dir: Path | None = None, layers: dict | None = None) -> Fast
         plans = json.loads(p.read_text(encoding="utf-8"))
         if code not in plans:
             raise HTTPException(404, f"no plan for municipality {code}")
-        return plans[code]
+        body = plans[code]
+        nisar_p = data / "vector" / "nisar_status.json"
+        if nisar_p.exists():  # AOI-level NISAR L-band cross-check, when built
+            body = {**body, "nisar": json.loads(nisar_p.read_text(encoding="utf-8"))}
+        return body
+
+    @app.get("/api/nisar")
+    def nisar():
+        p = data / "vector" / "nisar_scenes.json"
+        if not p.exists():
+            raise HTTPException(404, "nisar inventory not built")
+        return json.loads(p.read_text(encoding="utf-8"))
+
+    @app.get("/api/choreo")
+    def choreo():
+        p = data / "vector" / "choreo.json"
+        if not p.exists():
+            raise HTTPException(404, "choreography not built")
+        return json.loads(p.read_text(encoding="utf-8"))
+
+    @app.get("/api/nisar_product")
+    def nisar_product():
+        p = data / "vector" / "nisar_status.json"
+        if not p.exists():
+            raise HTTPException(404, "nisar product not built")
+        return json.loads(p.read_text(encoding="utf-8"))
 
     @app.api_route("/api/flood_polygons", methods=["GET", "HEAD"])  # HEAD: web checks it to enable export
     def flood_polygons():

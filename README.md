@@ -1,6 +1,6 @@
 # Fire Mok
 
-**English** | [Português](README.pt-BR.md) | [Español](README.es.md) | [Français](README.fr.md) | [中文](README.zh-CN.md) | [Русский](README.ru.md)
+**English** | [Português](README.pt-BR.md) | [Español](README.es.md) | [Français](README.fr.md) | [中文](README.zh-CN.md) | [Русский](README.ru.md) | [العربية](README.ar.md)
 
 [![CI](https://github.com/Wincarf/fire-mok/actions/workflows/ci.yml/badge.svg)](https://github.com/Wincarf/fire-mok/actions/workflows/ci.yml)
 [![monitoring](https://github.com/Wincarf/fire-mok/actions/workflows/update-data.yml/badge.svg)](https://github.com/Wincarf/fire-mok/actions/workflows/update-data.yml)
@@ -8,7 +8,7 @@
 
 Flood monitoring platform for Rio Grande do Sul, Brazil. Anchor case: the
 May 2024 flood in the Guaíba basin — detected in Sentinel-1 SAR
-(NISAR-ready), crossed with territory (IBGE), weather (Open-Meteo + NASA
+(NISAR GCOV integrated), crossed with territory (IBGE), weather (Open-Meteo + NASA
 POWER), terrain (Copernicus DEM + HAND) and population (WorldPop) into a
 municipal risk index with an action plan traceable to the data.
 
@@ -19,7 +19,8 @@ municipal risk index with an action plan traceable to the data.
 
 Full app, no backend — the [`gh-pages`](https://github.com/Wincarf/fire-mok/tree/gh-pages)
 branch serves the risk choropleth, the real SAR extent of the May 11, 2024
-flood, before/after compare, guided story and municipal panels. API
+flood, before/after compare, guided story, municipal panels and the three
+NISAR L-band layers (backscatter, open water, C×L duet). API
 endpoints are mirrored as files (`/api/municipalities`, `/api/layers`,
 `/api/plan/{code}`, pre-rendered tiles z6–12).
 
@@ -28,6 +29,25 @@ endpoints are mirrored as files (`/api/municipalities`, `/api/layers`,
 - Regenerate: `cd web && npm run build -- --base=/fire-mok/`, then
   `cd pipeline && uv run python ../scripts/build_pages.py --dist ../web/dist
   --out ../pages_site --data ../data` (data in `data/` must exist).
+
+## The Dance & the Monday card (new)
+
+- **The Dance** — three real Sentinel-1 beats over the May-2024 flood, in a
+  time slider with a play loop: **May 11 peak (203.7 km², ~70.8k people
+  exposed) → May 30 recession (47.6 km²) → Jun 4 calm (0 km²)**. Built by
+  `pipeline/scripts/build_choreo.py` (windowed PC RTC reads on a common
+  grid, WorldCover cleaning, per-municipality areal exposure).
+- **Monday card** — one click turns the selected beat into a pt-BR,
+  WhatsApp-ready alert card (copy & paste). Every line is backed by real
+  data; lines with no source (e.g. OSM schools/hospitals when Overpass is
+  unreachable) are simply omitted — never mocked.
+- **NISAR duet** — the C×L split mode and the three L-band layers
+  (backscatter, open water, duet) are **live**: the first L-band product
+  (GCOV granule of Nov 1, 2026) was built by the daily workflow and
+  deployed to gh-pages. Reproduce with: free Earthdata login with the
+  required profile fields (Study Area) + ASF app authorization → repo
+  secrets → run *monitoring update*.
+- New endpoints: `/api/choreo` and `/api/nisar_product`.
 
 ## Architecture
 
@@ -69,20 +89,33 @@ Public sources only — no Earthdata credentials needed.
 - `pipeline/scripts/update_latest.py` fetches the latest Sentinel-1 RTC
   scene over the AOI, builds the extent against the previous scene of the
   same pass and applies the context masks (`--dry-run` prints the plan).
+- No full-coverage pair in the 14-day window with an empty workspace
+  (fresh CI)? It rebuilds the reference extent from a 30-day lookback, so
+  the C×L duet always has a C-band counterpart.
 - GitHub Actions runs it **daily at 09:00 Brasília time**
   (`update-data.yml`) and publishes the new extent as an artifact.
 - Forward-looking rain: the risk index uses the **larger** of the last 7
   days' observed rain and the 7-day Open-Meteo **forecast**.
 
-## NISAR (mission validation band)
+## NISAR (NASA–ISRO, L-band) — live
 
-`pipeline/scripts/validate_nisar.py` downloads a NISAR GCOV scene via ASF
-DAAC and converts HDF5 -> COG.
+NISAR is wired into the monitoring pipeline (`pipeline/scripts/build_nisar.py`):
 
-- Requires `EARTHDATA_USER`/`EARTHDATA_PASS`; without credentials
-  the script logs `skipped: no Earthdata creds` and exits successfully.
-- NISAR (L-band) and Sentinel-1 (C-band) live in **separate layers** — not
-  comparable by difference.
+- **Always**: anonymous ASF search over the AOI → public scene inventory at
+  `/api/nisar` (60 GCOV scenes over the Guaíba AOI in the last year; runs
+  daily in CI).
+- **With a free Earthdata login** (`EARTHDATA_USER`/`EARTHDATA_PASS` or
+  netrc): downloads the newest GCOV granule, converts HDF5 → COG (dB) and
+  builds the AOI-window dB, the open-water proxy and the **C×L duet diff**
+  against the latest Sentinel-1 extent — published in `/api/nisar_product`
+  and on every action plan (`nisar` block in `/api/plan/{code}`). Missing
+  or refused credentials (e.g. an incomplete EDL profile) fall back to
+  `inventory-only`: the run stays green and daily monitoring never
+  blocks.
+
+L-band and C-band stay in **separate layers**; the **C×L duet** compares
+their water masks (3 classes: C-only / L-only) on labeled dates — never a
+raw dB difference.
 
 ## Validation
 
@@ -95,7 +128,7 @@ DAAC and converts HDF5 -> COG.
   79% on real-flood chips — superseded by the per-class + CI report.
 - Documented false positives (urban, permanent water) are **cut from the
   extent** with ESA WorldCover 10 m (built-up, permanent water classes).
-- `cd pipeline && uv run pytest tests/` — 87 tests; `api/tests/` 9;
+- `cd pipeline && uv run pytest tests/` — 95 tests; `api/tests/` 12;
   `web/` 20 (vitest). CI runs all three on GitHub Actions.
 
 ## License

@@ -22,7 +22,7 @@ export function Header({ tiler, tilerMs, coords, onExport, onStory }: Props) {
             Fire Mok
           </span>
           <span className="px-space-sm py-0.5 rounded-full bg-surface-container-high text-primary font-label-mono-xs text-label-mono-xs whitespace-nowrap">
-            v1.2 — Sentinel-1
+            v1.3 — Sentinel-1 + NISAR
           </span>
           <div className="hidden lg:flex items-center gap-space-xs px-space-sm py-1 rounded bg-surface-container-low">
             <span className={`w-2 h-2 rounded-full ${st.dot}`} />

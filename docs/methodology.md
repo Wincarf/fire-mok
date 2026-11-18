@@ -11,7 +11,7 @@ Audience: technical managers, scientific reviewers, judges.
 | Layer | Source | Product | Access |
 |---|---|---|---|
 | SAR backscatter (historical) | Sentinel-1 | RTC gamma0, VV band, `sentinel-1-rtc` collection | Microsoft Planetary Computer STAC, no authentication |
-| SAR backscatter (present) | NISAR | GCOV (HDF5, L-band) | ASF DAAC, requires Earthdata |
+| SAR backscatter (present) | NISAR | GCOV (HDF5, L-band) | ASF DAAC: public inventory daily in CI; granule download with a free Earthdata login |
 | Optical validation | Sentinel-2 | L2A (B03, B08, SCL) | Planetary Computer STAC |
 | Context (false positives) | ESA WorldCover | 10 m, classes 50 (built-up) and 80 (permanent water), epoch 2021 | Planetary Computer STAC (`esa-worldcover`) |
 | Terrain | Copernicus DEM | GLO-30 -> HAND (Height Above Nearest Drainage) | Planetary Computer STAC |
@@ -21,6 +21,12 @@ Audience: technical managers, scientific reviewers, judges.
 The two SAR sensors stay in **separate layers**: NISAR is L-band,
 Sentinel-1 is C-band. We do not difference across them — different
 frequencies respond differently to the same surface.
+
+NISAR GCOV is ingested by `scripts/build_nisar.py`: the anonymous ASF
+search produces the public scene inventory served at `/api/nisar` (60 GCOV
+scenes over the Guaíba AOI in the last year), and with a free Earthdata
+login the newest granule is converted to a dB COG whose L-band open-water
+proxy (fraction below mean − 1.5σ) is attached to every action plan.
 
 ## 2. Anchor case: the May 2024 Guaíba flood
 
@@ -51,6 +57,22 @@ areas still flooded on Jun 04, and it is mitigated by requiring a valid
   valid-baseline rule at coverage edges. Both masks are available as app
   layers (`permanent_water`, `urban`). A WorldCover download failure never
   blocks the build (the mask is context).
+
+### Flood choreography ("the Dance") and the Monday card
+
+The choreography replays the May-2024 event on real acquisitions. All beats
+are differenced against the June 4, 2024 recession scene (the same
+descending pass as the May 11 peak — the pipeline's standard dry baseline):
+σ0 < −15 dB, ESA WorldCover permanent-water and urban classes removed,
+connected blobs under ~1 ha dropped. The archive holds no pre-flood scene
+on this pass, so the dance opens in medias res at the peak — May 11
+(203.69 km²) — then May 30 (47.57 km², a different track, noted in the
+metadata) and June 4 (0 km², the baseline itself). Municipal exposure per
+beat is areal interpolation: municipality population × (flooded area ÷
+municipality area), labelled as an estimate. The Monday-morning card is a
+direct rendering of one beat of `choreo.json` — every line traces to that
+JSON; optional facility counts (schools, hospitals/clinics from OSM
+Overpass) appear only when the service is reachable.
 
 ## 4. Validation (Sentinel-2 NDWI, stratified chips over the AOI)
 
@@ -202,7 +224,7 @@ cd pipeline
 uv run python scripts/build_may2024.py            # downloads scenes, builds mask + polygons + preview (with WorldCover context)
 uv run python scripts/validate_flood.py --chips 30 # stratified validation vs Sentinel-2 NDWI (F1/IoU/kappa + CI)
 uv run python scripts/update_latest.py --dry-run   # ingestion plan for the latest scene
-uv run python scripts/validate_nisar.py           # NISAR GCOV (requires Earthdata)
+uv run python scripts/build_nisar.py             # NISAR GCOV: public inventory; product with Earthdata
 ```
 
 Artifacts: `data/sar/flood_extent_may2024.tif` (COG),
