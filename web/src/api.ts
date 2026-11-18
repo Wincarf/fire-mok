@@ -1,12 +1,14 @@
 // Typed boundary for the FastAPI backend — field names mirror
 // pipeline/types.py (MuniFeatures) and api/app.py responses.
 import type { RiskCategory } from "./risk";
+// Contract: fetchX throws on failure (HTTP or malformed payload); probeX
+// swallows and returns boolean. Plan fetches validate shape like municipalities.
 
 export interface MuniProps {
   code: string;
   name: string;
   risk: number;
-  risk_category: RiskCategory;
+  risk_category?: string; // narrowed to RiskCategory by isRiskCategory at consumption
   flood_frac: number;
   sus_frac: number;
   pop_exposed: number;
@@ -59,19 +61,25 @@ const isPlan = (d: unknown): d is Plan =>
   Array.isArray((d as Plan).reasons) &&
   Array.isArray((d as Plan).actions);
 
-export const fetchPlan = async (code: string): Promise<Plan | null> => {
+export const fetchPlan = async (code: string): Promise<Plan> => {
   const d = await getJson<unknown>(`/api/plan/${encodeURIComponent(code)}`);
   // unguarded .map on a malformed payload would crash the triage panel
   if (!isPlan(d)) {
     console.warn(`/api/plan/${code}: unexpected payload shape`, d);
-    return null;
+    throw new Error(`/api/plan/${code}: unexpected payload shape`);
   }
   return d;
 };
 
 // rio-tiler health probe for the header status pill
-export const probeTiler = async (): Promise<void> => {
-  await getJson("/api/layers");
+export const probeTiler = async (): Promise<boolean> => {
+  try {
+    await getJson("/api/layers");
+    return true;
+  } catch (err) {
+    console.warn("tiler probe failed:", err);
+    return false;
+  }
 };
 
 // flood-polygon export is only enabled when the layer was actually built
@@ -85,9 +93,9 @@ export const floodPolygonsAvailable = async (): Promise<boolean> => {
   }
 };
 
-export async function downloadJson(url: string, filename: string) {
+export async function downloadJson(path: string, filename: string) {
   try {
-    const r = await fetch(withBase(url));
+    const r = await fetch(withBase(path));
     if (!r.ok) {
       console.warn(`export ${filename}: HTTP ${r.status}`);
       return;

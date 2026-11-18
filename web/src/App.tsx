@@ -78,8 +78,9 @@ export default function App() {
       attributionControl: false,
     });
     // dev/e2e hook: inspect style state in tests
-    const w = window as unknown as { __map?: maplibregl.Map; __map2?: maplibregl.Map };
-    w.__map = m;
+    if (import.meta.env.DEV) {
+      (window as unknown as { __map?: maplibregl.Map }).__map = m; // dev/e2e hook
+    }
     map.current = m;
 
     // re-apply toggles/data whenever a (re)loaded style finishes — the old
@@ -118,7 +119,7 @@ export default function App() {
 
     return () => {
       cancelAnimationFrame(coordRaf);
-      delete w.__map;
+      delete (window as unknown as { __map?: maplibregl.Map }).__map;
       m.remove();
     };
   }, []);
@@ -138,7 +139,9 @@ export default function App() {
       zoom: m.getZoom(),
       attributionControl: false,
     });
-    (window as unknown as { __map2?: maplibregl.Map }).__map2 = m2; // dev/e2e hook
+    if (import.meta.env.DEV) {
+      (window as unknown as { __map2?: maplibregl.Map }).__map2 = m2; // dev/e2e hook
+    }
     m2.on("load", () => attachMuniInteractions(m2, setSelCode));
     bindMapData(m2, {
       munis: () => muniFc.current,
@@ -160,15 +163,10 @@ export default function App() {
   // rio-tiler health probe for the header status pill
   useEffect(() => {
     const t0 = performance.now();
-    probeTiler()
-      .then(() => {
-        setTiler("online");
-        setTilerMs(Math.round(performance.now() - t0));
-      })
-      .catch((err) => {
-        console.warn("tiler probe failed:", err);
-        setTiler("offline");
-      });
+    probeTiler().then((ok) => {
+      setTiler(ok ? "online" : "offline");
+      if (ok) setTilerMs(Math.round(performance.now() - t0));
+    });
   }, []);
 
   useEffect(() => {
