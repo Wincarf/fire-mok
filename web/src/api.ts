@@ -44,8 +44,22 @@ async function getJson<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const fetchMunicipalities = () => getJson<MuniFC>("/api/municipalities");
 
-export const fetchPlan = (code: string) =>
-  getJson<Plan>(`/api/plan/${encodeURIComponent(code)}`);
+const isPlan = (d: unknown): d is Plan =>
+  !!d &&
+  typeof d === "object" &&
+  typeof (d as Plan).priority === "string" &&
+  Array.isArray((d as Plan).reasons) &&
+  Array.isArray((d as Plan).actions);
+
+export const fetchPlan = async (code: string): Promise<Plan | null> => {
+  const d = await getJson<unknown>(`/api/plan/${encodeURIComponent(code)}`);
+  // unguarded .map on a malformed payload would crash the triage panel
+  if (!isPlan(d)) {
+    console.warn(`/api/plan/${code}: unexpected payload shape`, d);
+    return null;
+  }
+  return d;
+};
 
 // rio-tiler health probe for the header status pill
 export const probeTiler = async (): Promise<void> => {
@@ -57,7 +71,8 @@ export const floodPolygonsAvailable = async (): Promise<boolean> => {
   try {
     const r = await fetch(withBase("/api/flood_polygons"), { method: "HEAD" });
     return r.ok;
-  } catch {
+  } catch (err) {
+    console.warn("flood_polygons probe failed:", err);
     return false;
   }
 };
@@ -72,7 +87,7 @@ export async function downloadJson(url: string, filename: string) {
     a.download = filename;
     a.click();
     URL.revokeObjectURL(a.href);
-  } catch {
-    /* offline / api down — nothing to export */
+  } catch (err) {
+    console.warn(`export ${filename} failed:`, err);
   }
 }

@@ -12,13 +12,6 @@ export const RISK_CATEGORIES: readonly RiskCategory[] = [
   "low",
 ];
 
-export const RISK_LABEL: Record<RiskCategory, string> = {
-  critical: "critical",
-  high: "high",
-  moderate: "moderate",
-  low: "low",
-};
-
 // canonical palette — map fill/line + legend chips share these hues
 export const RISK_COLOR: Record<RiskCategory, string> = {
   critical: "#ef4444", // red-500

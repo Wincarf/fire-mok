@@ -1,5 +1,7 @@
 import type { RefObject, ReactNode, PointerEvent } from "react";
-import { RISK_CHIP, RISK_LABEL, RISK_CATEGORIES } from "../risk";
+import { RISK_CHIP, RISK_CATEGORIES } from "../risk";
+import { sarSceneDate } from "../format";
+import { SAR_SCENE_AFTER, SAR_SCENE_BEFORE } from "../mapStyle";
 import type { RiskCounts } from "../stats";
 
 type Props = {
@@ -41,7 +43,7 @@ export function MapHud({
         style={compare ? { clipPath: `inset(0 0 0 ${split}%)` } : undefined}
       />
 
-      {/* Risk legend — counts come from the real /api/municipalities payload */}
+      {/* Risk legend — municipal category counts */}
       <div className="absolute top-space-md left-space-md z-20 flex items-center gap-space-sm pointer-events-none">
         <div className="px-space-md py-space-xs rounded bg-surface-container-lowest/90 backdrop-blur-md border border-outline-variant flex items-center gap-space-md">
           <span className="font-label-mono-xs text-label-mono-xs text-on-surface font-semibold tracking-wider">
@@ -50,7 +52,7 @@ export function MapHud({
           {RISK_CATEGORIES.map((k) => (
             <span key={k} className="flex items-center gap-1.5 font-label-mono-xs text-label-mono-xs">
               <span className={`w-2.5 h-2.5 rounded-sm ${RISK_CHIP[k]}`} />
-              <span className="text-on-surface-variant">{RISK_LABEL[k]}</span>
+              <span className="text-on-surface-variant">{k}</span>
               <span className="text-primary font-medium">{counts[k]}</span>
             </span>
           ))}
@@ -63,13 +65,13 @@ export function MapHud({
           <div className="px-space-md py-space-xs rounded bg-surface-container-lowest/90 backdrop-blur-md border border-outline-variant flex items-center gap-space-sm">
             <span className="w-2.5 h-2.5 rounded-full bg-primary" />
             <span className="font-label-mono-xs text-label-mono-xs text-on-surface font-semibold tracking-wider">
-              RECESSION · 04/JUN/24
+              RECESSION · {sarSceneDate(SAR_SCENE_BEFORE).toUpperCase()}
             </span>
           </div>
           <div className="px-space-md py-space-xs rounded bg-surface-container-lowest/90 backdrop-blur-md border border-outline-variant flex items-center gap-space-sm">
             <span className="w-2.5 h-2.5 rounded-full bg-error animate-pulse" />
             <span className="font-label-mono-xs text-label-mono-xs text-on-surface font-semibold tracking-wider">
-              SAR PEAK · 11/MAY/24
+              SAR PEAK · {sarSceneDate(SAR_SCENE_AFTER).toUpperCase()}
             </span>
           </div>
         </div>

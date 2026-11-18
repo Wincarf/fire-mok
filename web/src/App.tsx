@@ -77,7 +77,9 @@ export default function App() {
       zoom: 9,
       attributionControl: false,
     });
-    (window as any).__map = m; // dev/e2e hook: inspect style state in tests
+    // dev/e2e hook: inspect style state in tests
+    const w = window as unknown as { __map?: maplibregl.Map; __map2?: maplibregl.Map };
+    w.__map = m;
     map.current = m;
 
     // re-apply toggles/data whenever a (re)loaded style finishes — the old
@@ -109,10 +111,14 @@ export default function App() {
         muniFc.current = d;
         for (const mm of [map.current, beforeMap.current]) if (mm) feedMuni(mm, d);
       })
-      .catch(() => setMunisFailed(true));
+      .catch((err) => {
+        console.warn("/api/municipalities failed:", err);
+        setMunisFailed(true);
+      });
 
     return () => {
       cancelAnimationFrame(coordRaf);
+      delete w.__map;
       m.remove();
     };
   }, []);
@@ -132,7 +138,7 @@ export default function App() {
       zoom: m.getZoom(),
       attributionControl: false,
     });
-    (window as any).__map2 = m2; // dev/e2e hook
+    (window as unknown as { __map2?: maplibregl.Map }).__map2 = m2; // dev/e2e hook
     m2.on("load", () => attachMuniInteractions(m2, setSelCode));
     bindMapData(m2, {
       munis: () => muniFc.current,
@@ -144,6 +150,7 @@ export default function App() {
     const unsync = syncMaps(m, m2);
     return () => {
       unsync();
+      delete (window as unknown as { __map2?: maplibregl.Map }).__map2;
       m2.remove();
       beforeMap.current = null;
     };
@@ -183,7 +190,10 @@ export default function App() {
     let alive = true;
     fetchPlan(sel.code)
       .then((d) => alive && setPlan(d))
-      .catch(() => alive && setPlan(null));
+      .catch((err) => {
+        console.warn(`/api/plan/${sel.code} failed:`, err);
+        if (alive) setPlan(null);
+      });
     return () => {
       alive = false;
       setPlan(null);

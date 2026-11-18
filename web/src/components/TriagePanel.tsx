@@ -1,4 +1,4 @@
-import { RISK_LABEL, RISK_BADGE, isRiskCategory } from "../risk";
+import { RISK_BADGE, isRiskCategory } from "../risk";
 import type { MuniProps, Plan } from "../api";
 import { riskScore10, fmtInt, fmtPct } from "../format";
 
@@ -69,7 +69,7 @@ export function TriagePanel({ sel, plan, floodOk, onClose, onExportFlood }: Prop
                 : "bg-surface-container text-on-surface-variant border-outline-variant"
             }`}
           >
-            Level {cat ? RISK_LABEL[cat] : "unknown"}
+            Level {cat ?? "unknown"}
           </span>
         </div>
       </div>
@@ -114,7 +114,7 @@ export function TriagePanel({ sel, plan, floodOk, onClose, onExportFlood }: Prop
               Risk factors
             </span>
             <span className="font-label-mono-xs text-label-mono-xs text-primary font-medium uppercase">
-              Priority {isRiskCategory(plan.priority) ? RISK_LABEL[plan.priority] : plan.priority}
+              Priority {plan.priority}
             </span>
           </div>
           <ul className="rounded-lg bg-surface-container-low p-space-sm space-y-space-xs">

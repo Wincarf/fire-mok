@@ -1,6 +1,6 @@
 import type { Vis } from "../vis";
 import { SAR_PLATFORM } from "../format";
-import { RISK_CATEGORIES, RISK_CHIP, RISK_LABEL } from "../risk";
+import { RISK_CATEGORIES, RISK_CHIP } from "../risk";
 
 type Props = {
   layers: Vis;
@@ -57,7 +57,7 @@ export function LayersDrawer({ layers, onToggle, summary, lastPass }: Props) {
             {RISK_CATEGORIES.map((r) => (
               <span key={r} className="flex items-center gap-space-xs font-label-mono-xs text-label-mono-xs text-on-surface-variant">
                 <i className={`w-2.5 h-2.5 rounded-sm ${RISK_CHIP[r]}`} />
-                {RISK_LABEL[r]}
+                {r}
               </span>
             ))}
           </div>

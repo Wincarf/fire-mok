@@ -1,4 +1,4 @@
-// Display helpers for the HUD — all values derived from real data, never mocked.
+// Display helpers for the HUD.
 
 export const SAR_PLATFORM = "Sentinel-1A · IW GRD";
 
