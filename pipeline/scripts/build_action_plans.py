@@ -7,15 +7,15 @@ from pathlib import Path
 
 import geopandas as gpd
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-
 from pipeline.action_plan import build_action_plan
 
-logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
+logger = logging.getLogger("build_action_plans")
+
 DATA = Path(__file__).resolve().parents[2] / "data"
 
 
 def main() -> int:
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
     risk = gpd.read_file(DATA / "vector" / "municipalities_risk_may2024.geojson")
     plans = {}
     for _, m in risk[risk.flood_frac > 0].iterrows():
@@ -23,8 +23,7 @@ def main() -> int:
         plans[m["code"]] = p
     out = DATA / "vector" / "action_plans_may2024.json"
     out.write_text(json.dumps(plans, ensure_ascii=False, indent=1), encoding="utf-8")
-    print(json.dumps(plans.get("4305108", {}), ensure_ascii=False, indent=1))  # Eldorado do Sul
-    logging.getLogger("plans").info("plans for %d municipalities -> %s", len(plans), out)
+    logger.info("plans for %d municipalities -> %s", len(plans), out)
     return 0
 
 

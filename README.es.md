@@ -83,7 +83,7 @@ Solo fuentes públicas — sin credenciales de Earthdata.
 `pipeline/scripts/validate_nisar.py` descarga una escena NISAR GCOV vía
 ASF DAAC y convierte HDF5 -> COG.
 
-- Requiere `EARTHDATA_USERNAME`/`EARTHDATA_PASSWORD`; sin credenciales el
+- Requiere `EARTHDATA_USER`/`EARTHDATA_PASS`; sin credenciales el
   script registra `skipped: no Earthdata creds` y termina con éxito.
 - NISAR (banda L) y Sentinel-1 (banda C) viven en **capas separadas** — no
   comparables por diferencia.

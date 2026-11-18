@@ -1,5 +1,6 @@
 """Precipitation + soil-moisture features from Open-Meteo (no auth required)."""
 
+import json
 import logging
 import time
 from pathlib import Path
@@ -57,8 +58,19 @@ def parse_open_meteo(payload: dict) -> dict:
     """Extract series + missingness counts. Missing values are reported, never imputed."""
     precip, miss_p = _clean(_series(payload, "daily", "precipitation_sum"))
     soil, miss_s = _clean(_series(payload, "hourly", "soil_moisture_0_to_7cm"))
+    # date-keyed precip for cross-source alignment (positions shift when days
+    # are dropped, so the POWER cross-check must join on dates)
+    precip_daily = {
+        d: float(v)
+        for d, v in zip(
+            _series(payload, "daily", "time"),
+            _series(payload, "daily", "precipitation_sum"),
+        )
+        if v is not None
+    }
     return {
         "precip": precip,
+        "precip_daily": precip_daily,
         "soil": soil,
         "precip_total_mm": float(np.sum(precip)),
         "soil_moisture_mean": float(np.mean(soil)) if soil else np.nan,
@@ -94,7 +106,6 @@ def load_parse(lat: float, lon: float, start: str, end: str) -> dict:
     """Fetch (file-cached) + parse — exposes the daily series for cross-checks."""
     CACHE.mkdir(parents=True, exist_ok=True)
     key = CACHE / f"meteo_{lat:.3f}_{lon:.3f}_{start}_{end}.json".replace("-", "m").replace(":", "_")
-    import json
 
     if key.exists():
         payload = json.loads(key.read_text())
@@ -115,12 +126,11 @@ FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
 def forecast_max7d(lat: float, lon: float, days: int = 7, timeout: float = 60.0) -> dict:
     """Forward-looking 7-day precipitation max (Open-Meteo forecast API).
 
-    Returns {'precip_forecast_max7d_mm', 'n_forecast_days'}; HTTP/network
-    errors propagate — caller decides the fallback (index treats missing
-    forecast as 0).
+    Returns {'precip_forecast_max7d_mm', 'n_forecast_days', 'raw'} where 'raw'
+    is the JSON-encoded daily series for provenance. HTTP/network errors
+    propagate — caller decides the fallback (index treats missing forecast
+    as 0).
     """
-    import json as _json
-
     params = {
         "latitude": lat,
         "longitude": lon,
@@ -128,11 +138,12 @@ def forecast_max7d(lat: float, lon: float, days: int = 7, timeout: float = 60.0)
         "forecast_days": days,
         "timezone": "America/Sao_Paulo",
     }
-    payload = httpx.get(FORECAST_URL, params=params, timeout=timeout).json()
-    vals = payload.get("daily", {}).get("precipitation_sum") or []
+    r = httpx.get(FORECAST_URL, params=params, timeout=timeout)
+    r.raise_for_status()
+    vals = r.json().get("daily", {}).get("precipitation_sum") or []
     good = [float(v) for v in vals if v is not None]
     return {
         "precip_forecast_max7d_mm": rolling_max(good, days),
         "n_forecast_days": len(good),
-        "raw": _json.dumps(vals),
+        "raw": json.dumps(vals),
     }

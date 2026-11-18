@@ -44,12 +44,11 @@ def density_from_counts(
     if c.max() <= 0:
         return None
     density_src = c / src_px_area
-    density_dst = np.full(dst_shape, np.nan, dtype="float32")
-    reproject(
-        density_src, density_dst,
-        src_transform=src_transform, src_crs=src_crs,
-        dst_transform=dst_transform, dst_crs=dst_crs,
-        resampling=Resampling.average, src_nodata=np.nan, dst_nodata=np.nan,
+    from pipeline.raster import reproject_to_grid
+
+    density_dst = reproject_to_grid(
+        density_src, src_transform, src_crs, dst_transform, dst_crs,
+        dst_shape, resampling=Resampling.average,
     )
     return density_dst * dst_px_area  # people per dst pixel
 

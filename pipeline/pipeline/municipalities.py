@@ -10,6 +10,8 @@ import numpy as np
 from affine import Affine
 from rasterio.features import geometry_mask
 
+from pipeline.population import exposed_population
+
 logger = logging.getLogger(__name__)
 
 MALHAS_URL = (
@@ -19,7 +21,7 @@ MALHAS_URL = (
 SIDRA_URL = (
     "https://apisidra.ibge.gov.br/values/t/4709/n6/in%20n3%2043/v/93/p/last?formato=json"
 )
-FIXTURE = Path(__file__).resolve().parents[1] / "tests" / "fixtures" / "municipalities_fixture.geojson"
+FIXTURE = Path(__file__).resolve().with_name("municipalities_fallback.geojson")
 
 
 def parse_population_table(payload: list[dict]) -> dict[str, int]:
@@ -79,9 +81,8 @@ def exposure_by_municipality(
     Without it: uniform density inside the municipality — screening estimate
     only. Mask must be in a metric projected CRS.
     """
-    from pipeline.population import exposed_population
-
     px_area = abs(transform.a * transform.e)
+    out_crs = muni.crs or crs
     muni = muni.to_crs(crs)
     rows = []
     for _, row in muni.iterrows():
@@ -106,4 +107,4 @@ def exposure_by_municipality(
                 "geometry": row.geometry,
             }
         )
-    return gpd.GeoDataFrame(rows, crs=crs).to_crs(muni.crs if muni.crs else crs)
+    return gpd.GeoDataFrame(rows, crs=crs).to_crs(out_crs)

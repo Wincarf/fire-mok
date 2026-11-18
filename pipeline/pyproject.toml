@@ -3,6 +3,7 @@ name = "pipeline"
 version = "0.1.0"
 requires-python = ">=3.13"
 dependencies = [
+    "affine>=2.4.0",
     "asf-search>=14.1.0",
     "fastapi>=0.162.7",
     "geopandas>=1.2.0",
@@ -10,18 +11,26 @@ dependencies = [
     "httpx>=0.28.1",
     "matplotlib>=3.11.2",
     "numpy>=2.5.4",
+    "pandas>=2.3.0",
     "planetary-computer>=1.0.0",
+    "pystac>=1.10.0",
     "pystac-client>=0.9.1",
-    "pytest>=9.2.0",
     "rasterio>=1.5.2",
     "rio-tiler>=9.4.13",
     "scipy>=1.18.1",
-    "titiler-core>=2.4.0",
+    "shapely>=2.0.0",
     "uvicorn>=0.54.0",
 ]
 
-[tool.uv]
-package = false
+[dependency-groups]
+dev = ["pytest>=9.2.0"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["pipeline"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]

@@ -59,15 +59,26 @@ def search_nisar_gcov(
     scenes = []
     for r in results:
         p = r.properties
+        footprint = _result_bounds(r)
         scenes.append(
             Scene(
                 id=p.get("fileID") or p.get("sceneName") or p.get("fileName") or "nisar",
                 datetime=str(p.get("startTime", "")),
                 url=p.get("url", ""),
-                bbox=bbox,
+                bbox=footprint,
             )
         )
     return scenes
+
+
+def _result_bounds(result) -> tuple[float, float, float, float] | None:
+    """Scene footprint bounds from the ASF result geometry, if present."""
+    geom = getattr(result, "geometry", None)
+    if not geom:
+        return None
+    from shapely.geometry import shape
+
+    return tuple(shape(geom).bounds)
 
 
 def download_gcov(scene: Scene, session: "asf.ASFSession", out_dir: Path) -> Path:

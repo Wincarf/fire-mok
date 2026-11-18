@@ -22,9 +22,11 @@ def _scene(sid, bbox=AOI):
 
 
 def test_pass_token_and_sensing_time():
+    from pipeline.stac import scene_datetime_from_id
+
     sid = "S1A_IW_GRDH_1SDV_20240511T084943_20240511T085008_053821_068A6E_rtc"
     assert ul.pass_token(sid) == "0849"
-    t = ul.sensing_time(sid)
+    t = scene_datetime_from_id(sid)
     assert (t.year, t.month, t.day) == (2024, 5, 11)
 
 

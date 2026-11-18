@@ -7,17 +7,15 @@ from pathlib import Path
 import geopandas as gpd
 import pandas as pd
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-
 from pipeline.risk import categorize, risk_score
 
-logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 logger = logging.getLogger("build_risk")
 
 DATA = Path(__file__).resolve().parents[2] / "data"
 
 
 def main() -> int:
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
     vec = DATA / "vector"
     expo = gpd.read_file(vec / "municipalities_exposure_may2024.geojson")
     meteo = gpd.read_file(vec / "municipalities_meteo_2024-04-15_2024-05-31.geojson")

@@ -81,7 +81,7 @@ docker build -t fire-mok . && docker run -p 8000:8000 -v "$PWD/data:/app/data" f
 `pipeline/scripts/validate_nisar.py` скачивает сцену NISAR GCOV через ASF
 DAAC и конвертирует HDF5 -> COG.
 
-- Требует `EARTHDATA_USERNAME`/`EARTHDATA_PASSWORD`; без учётных данных
+- Требует `EARTHDATA_USER`/`EARTHDATA_PASS`; без учётных данных
   скрипт логирует `skipped: no Earthdata creds` и завершается успешно.
 - NISAR (L-диапазон) и Sentinel-1 (C-диапазон) хранятся в **отдельных
   слоях** — несравнимы через разность.

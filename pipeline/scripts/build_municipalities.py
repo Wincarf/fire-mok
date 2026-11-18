@@ -7,18 +7,16 @@ from pathlib import Path
 import numpy as np
 import rasterio
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-
 from pipeline.municipalities import exposure_by_municipality, load_municipalities
 from pipeline.population import fetch_pop_density_grid
 
-logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 logger = logging.getLogger("build_municipalities")
 
 DATA = Path(__file__).resolve().parents[2] / "data"
 
 
 def main() -> int:
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
     out_dir = DATA / "vector"
     out_dir.mkdir(parents=True, exist_ok=True)
 

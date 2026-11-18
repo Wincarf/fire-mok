@@ -3,6 +3,7 @@
 Requires a DEM in metres on a north-up metric projected grid (geomaster gate).
 """
 
+import heapq
 import logging
 from pathlib import Path
 
@@ -53,8 +54,6 @@ def fill_dem(dem: np.ndarray, eps: float = 0.01) -> np.ndarray:
     Guarantees strictly descending flow paths (no pits, no flats) so D8 has
     no cycles. NaN cells stay NaN and act as sinks.
     """
-    import heapq
-
     dem = np.asarray(dem, dtype="float32")
     h, w = dem.shape
     filled = dem.copy()
@@ -132,11 +131,12 @@ def flow_accumulation(filled: np.ndarray, recv: np.ndarray) -> np.ndarray:
     return acc
 
 
-def hand(dem: np.ndarray, transform: Affine, acc_thresh_cells: int = 1000) -> np.ndarray:
+def hand(dem: np.ndarray, acc_thresh_cells: int = 1000) -> np.ndarray:
     """Height Above Nearest Drainage in metres (NaN where no stream reached).
 
-    Streams = cells with flow accumulation >= acc_thresh_cells. Requires a
-    metric, north-up grid (same gate as slope_deg).
+    Streams = cells with flow accumulation >= acc_thresh_cells. The math runs
+    per-cell (D8 distances in cell units), so callers must feed a metric
+    north-up DEM for the threshold to mean metres.
     """
     dem = np.asarray(dem, dtype="float32")
     filled = fill_dem(dem)
@@ -171,13 +171,16 @@ def susceptibility_hand(
     hand_thresh_m: float = 15.0,
     slope_thresh_deg: float = 5.0,
     acc_thresh_cells: int = 1000,
+    hand_arr: np.ndarray | None = None,
 ) -> np.ndarray:
     """Boolean screening mask: HAND below threshold AND slope below threshold.
 
     HAND < 15 m approximates the floodplain; the threshold is a screening
-    choice, documented in docs/methodology.md.
+    choice, documented in docs/methodology.md. Pass hand_arr when the caller
+    already computed HAND (e.g. to also write the HAND raster) so it is not
+    recomputed.
     """
-    h = hand(dem, transform, acc_thresh_cells)
+    h = hand(dem, acc_thresh_cells) if hand_arr is None else hand_arr
     s = slope_deg(dem, transform)
     out = (h < hand_thresh_m) & (s < slope_thresh_deg)
     return out & ~np.isnan(dem) & ~np.isnan(h) & ~np.isnan(s)

@@ -7,7 +7,7 @@ WORKDIR /app
 
 # deps first (layer cache): pipeline project defines the shared venv
 COPY pipeline/pyproject.toml pipeline/uv.lock ./pipeline/
-RUN cd pipeline && uv sync --frozen --no-install-project
+RUN cd pipeline && uv sync --frozen --no-install-project --no-dev
 
 COPY pipeline/pipeline ./pipeline/pipeline
 COPY api ./api

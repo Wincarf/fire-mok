@@ -1,8 +1,9 @@
 """Static mirror of the API + pre-rendered tiles for GitHub Pages.
 
-Replicates api/app.py behavior exactly (colormaps/rescale from web/src/App.tsx)
-so the same URLs work on static hosting: /tiles/*.png (query ignored),
-/api/municipalities, /api/layers, /api/flood_polygons, /api/plan/{code}.
+Replicates api/app.py behavior exactly (colormaps/rescale come from the shared
+api/layers.json manifest — same file the web app reads) so the same URLs work
+on static hosting: /tiles/*.png (query ignored), /api/municipalities,
+/api/layers, /api/flood_polygons, /api/plan/{code}.
 
 Usage (from pipeline venv):
     cd pipeline && uv run python ../scripts/build_pages.py \
@@ -16,65 +17,71 @@ import shutil
 import sys
 from pathlib import Path
 
-import numpy as np
 import rasterio
 from rasterio.warp import transform_bounds
 from rio_tiler.io import COGReader
 from rio_tiler.models import ImageData
 
-# must match api/app.py LAYERS + the layers the web app actually renders
-TILE_LAYERS = {
-    "sar_before": ("sar/S1A_IW_GRDH_1SDV_20240604T084924_20240604T084953_054171_069681_rtc_vv_db.tif", "rescale=-30,0"),
-    "sar_after": ("sar/S1A_IW_GRDH_1SDV_20240511T084943_20240511T085008_053821_068A6E_rtc_vv_db.tif", "rescale=-30,0"),
-    "flood_extent": ("sar/flood_extent_may2024.tif", None),
-    "susceptibility": ("terrain/susceptibility_guaiba.tif", None),
-}
-# web/src/App.tsx colormaps (URL-encoded JSON on the live API; baked into files here)
-FLOOD_CMAP = {0: (0, 0, 0, 0), 1: (220, 38, 38, 200)}
-SUS_CMAP = {0: (0, 0, 0, 0), 1: (37, 99, 235, 140)}
+MANIFEST_PATH = Path(__file__).resolve().parents[1] / "api" / "layers.json"
 AOI_BBOX = (-51.6, -30.4, -50.7, -29.7)  # pipeline/aoi.py "guaiba"
-Z_RANGE = range(6, 13)  # app opens at z9; z12 is plenty for a demo
 
 
-def render_layer(name: str, rel: str, special: str | None, out_dir: Path, data: Path) -> int:
-    """Pre-render every tile in Z_RANGE intersecting AOI∩bounds. Returns tile count."""
+def _tile_xy(lon: float, lat: float, z: int) -> tuple[float, float]:
+    """lon/lat (4326) -> fractional tile indices (no 3857 detour)."""
+    x = (lon + 180.0) / 360.0 * 2**z
+    lr = math.radians(lat)
+    y = (1.0 - math.asinh(math.tan(lr)) / math.pi) / 2.0 * 2**z
+    return x, y
+
+
+def _render_cmap(entry: dict):
+    """Manifest render.colormap ({'0': rgba, ...}) -> rio-tiler colormap."""
+    raw = entry.get("render", {}).get("colormap")
+    return {float(k): tuple(v) for k, v in raw.items()} if raw else None
+
+
+def render_layer(
+    name: str, entry: dict, out_dir: Path, data: Path, z_range: range
+) -> int:
+    """Pre-render every tile in z_range intersecting AOI∩bounds. Returns tile count."""
+    rel = entry["path"]
     path = data / rel
     if not path.exists():
         print(f"  [skip] {name}: {rel} missing")
         return 0
-    cmap = FLOOD_CMAP if name == "flood_extent" else SUS_CMAP if name == "susceptibility" else None
+    cmap = _render_cmap(entry)
+    rescale = entry.get("render", {}).get("rescale")
     n = 0
+    skipped = 0
+    first_err = None
     with COGReader(str(path)) as cog:
         # clamp the tile sweep to AOI ∩ data bounds (scene footprints can be
         # wider); cog.bounds may be in a projected CRS — normalize to 4326 first
         b = transform_bounds(cog.crs, "EPSG:4326", *cog.bounds, densify_pts=21)
         lo = (max(b[0], AOI_BBOX[0]), max(b[1], AOI_BBOX[1]), min(b[2], AOI_BBOX[2]), min(b[3], AOI_BBOX[3]))
-        for z in Z_RANGE:
-            # xy() converts lon/lat (4326) straight to tile indices — no
-            # detour through 3857 (meters), which would empty the ranges
-            def xy(lon, lat, z):
-                x = (lon + 180.0) / 360.0 * 2**z
-                lr = math.radians(lat)
-                y = (1.0 - math.asinh(math.tan(lr)) / math.pi) / 2.0 * 2**z
-                return x, y
-
-            x0, y1 = xy(lo[0], lo[1], z)
-            x1, y0 = xy(lo[2], lo[3], z)
+        for z in z_range:
+            x0, y1 = _tile_xy(lo[0], lo[1], z)
+            x1, y0 = _tile_xy(lo[2], lo[3], z)
             for tx in range(max(0, int(x0)), min(2**z, int(x1) + 1)):
                 for ty in range(max(0, int(y0)), min(2**z, int(y1) + 1)):
                     try:
                         img = cog.tile(tx, ty, z)
-                    except Exception:
+                    except Exception as exc:
+                        skipped += 1
+                        if first_err is None:
+                            first_err = f"{z}/{tx}/{ty}: {exc}"
                         continue
                     if str(img.array.dtype) == "bool":
                         img = ImageData(img.array.astype("uint8"), assets=img.assets, crs=img.crs, bounds=img.bounds)
-                    if special == "rescale=-30,0":
-                        img = img.rescale([(-30.0, 0.0)])
+                    if rescale:
+                        img = img.rescale([tuple(rescale)])
                     png = img.render(img_format="PNG", colormap=cmap)
                     d = out_dir / "tiles" / name / str(z) / str(tx)
                     d.mkdir(parents=True, exist_ok=True)
                     (d / f"{ty}.png").write_bytes(png)
                     n += 1
+    if skipped:
+        print(f"  [warn] {name}: {skipped} tiles skipped (first: {first_err})")
     return n
 
 
@@ -86,8 +93,9 @@ def main() -> int:
     ap.add_argument("--min-z", type=int, default=6)
     ap.add_argument("--max-z", type=int, default=12)
     args = ap.parse_args()
-    global Z_RANGE
-    Z_RANGE = range(args.min_z, args.max_z + 1)
+    z_range = range(args.min_z, args.max_z + 1)
+
+    manifest = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
 
     out = args.out
     if out.exists():
@@ -121,24 +129,15 @@ def main() -> int:
             shutil.copyfile(p, api / dst)
             print(f"  api/{dst}: {p.stat().st_size / 1e6:.1f} MB")
     # /api/layers — same shape as app.py (id/available/bounds/dtype)
-    LAYERS = {
-        "sar_before": TILE_LAYERS["sar_before"][0], "sar_after": TILE_LAYERS["sar_after"][0],
-        "flood_extent": TILE_LAYERS["flood_extent"][0],
-        "permanent_water": "context/permanent_water_guaiba.tif",
-        "urban": "context/urban_guaiba.tif",
-        "susceptibility": TILE_LAYERS["susceptibility"][0],
-        "hand": "terrain/hand_guaiba.tif",
-        "dem": "terrain/cop_dem_glo30_guaiba.tif",
-    }
     layers = []
-    for name, rel in LAYERS.items():
-        p = args.data / rel
-        entry = {"id": name, "available": p.exists()}
+    for name, entry in manifest.items():
+        p = args.data / entry["path"]
+        item = {"id": name, "available": p.exists()}
         if p.exists():
             with rasterio.open(p) as src:
-                entry["bounds"] = list(transform_bounds(src.crs, 4326, *src.bounds))
-                entry["dtype"] = src.dtypes[0]
-        layers.append(entry)
+                item["bounds"] = list(transform_bounds(src.crs, 4326, *src.bounds))
+                item["dtype"] = src.dtypes[0]
+        layers.append(item)
     (api / "layers").write_text(json.dumps({"layers": layers}))
     # /api/plan/{code} — one extensionless file per municipality
     plans_p = args.data / "vector" / "action_plans_may2024.json"
@@ -149,10 +148,12 @@ def main() -> int:
             (api / "plan" / code).write_text(json.dumps(body, ensure_ascii=False))
         print(f"  api/plan/: {len(plans)} files")
 
-    # 3) pre-rendered tiles
+    # 3) pre-rendered tiles (manifest entries flagged prerender)
     total = 0
-    for name, (rel, special) in TILE_LAYERS.items():
-        n = render_layer(name, rel, special, out / "site", args.data)
+    for name, entry in manifest.items():
+        if not entry.get("prerender"):
+            continue
+        n = render_layer(name, entry, out / "site", args.data, z_range)
         print(f"  tiles/{name}: {n}")
         total += n
 

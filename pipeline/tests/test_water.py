@@ -2,7 +2,8 @@ import numpy as np
 from affine import Affine
 from rasterio.crs import CRS
 
-from pipeline.water import filter_min_area, flood_extent, mask_to_polygons, water_mask, write_mask_cog
+from pipeline.raster import write_mask_cog
+from pipeline.water import filter_min_area, flood_extent, mask_to_polygons, water_mask
 
 
 def test_water_mask_threshold():

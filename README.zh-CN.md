@@ -78,7 +78,7 @@ docker build -t fire-mok . && docker run -p 8000:8000 -v "$PWD/data:/app/data" f
 `pipeline/scripts/validate_nisar.py` 通过 ASF DAAC 下载 NISAR GCOV
 影像，并将 HDF5 转换为 COG。
 
-- 需要 `EARTHDATA_USERNAME`/`EARTHDATA_PASSWORD`；无凭据时脚本会记录
+- 需要 `EARTHDATA_USER`/`EARTHDATA_PASS`；无凭据时脚本会记录
   `skipped: no Earthdata creds` 并正常退出。
 - NISAR（L 波段）与 Sentinel-1（C 波段）分别保存在**不同图层**——
   不可通过差值进行比较。

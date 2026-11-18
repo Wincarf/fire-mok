@@ -10,16 +10,15 @@ built-up areas flip bright-to-dark between scenes and pass change detection,
 and permanent water at baseline nodata edges escapes the valid-baseline rule.
 """
 
-from pathlib import Path
-
 import numpy as np
 import rasterio
 from rasterio.warp import Resampling, reproject
 
+from pipeline.stac import PC_STAC_URL
+
 WC_URBAN = 50
 WC_WATER = 80
 
-PC_URL = "https://planetarycomputer.microsoft.com/api/stac/v1"
 WC_COLLECTION = "esa-worldcover"
 WC_DATETIME = "2021"  # single yearly epoch, v200
 
@@ -67,7 +66,7 @@ def fetch_worldcover_for_bounds(bounds_4326, dst_transform, dst_crs, dst_shape) 
     from pystac_client import Client
     from shapely.geometry import box, shape
 
-    cat = Client.open(PC_URL)
+    cat = Client.open(PC_STAC_URL)
     search = cat.search(collections=[WC_COLLECTION], bbox=list(bounds_4326), datetime=WC_DATETIME)
     items = list(search.items())
     if not items:
@@ -86,16 +85,3 @@ def fetch_worldcover_for_bounds(bounds_4326, dst_transform, dst_crs, dst_shape) 
             src_nodata=0, dst_nodata=0,
         )
     return dst
-
-
-def save_mask_cog(mask: np.ndarray, profile: dict, out: Path) -> Path:
-    """Write a boolean context mask (0/1) as COG using the SAR grid profile."""
-    out = Path(out)
-    out.parent.mkdir(parents=True, exist_ok=True)
-    p = dict(profile)
-    for key in ("tiled", "blockxsize", "blockysize", "interleave"):
-        p.pop(key, None)
-    p.update(driver="COG", dtype="uint8", count=1, nodata=None, compress="deflate")
-    with rasterio.open(out, "w", **p) as dst:
-        dst.write(mask.astype("uint8"), 1)
-    return out

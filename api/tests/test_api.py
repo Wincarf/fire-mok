@@ -27,21 +27,21 @@ def _tiny_cog(path: Path, val: float):
         ds.write(arr, 1)
 
 
-@pytest.fixture()
-def client(tmp_path):
+TEST_LAYERS = {
+    "sar_before": "sar/b.tif", "sar_after": "sar/a.tif",
+    "flood_extent": "sar/f.tif", "permanent_water": "context/pw.tif",
+    "urban": "context/urb.tif", "susceptibility": "terrain/s.tif",
+    "hand": "terrain/h.tif", "dem": "terrain/d.tif",
+}
+
+
+def _make_client(tmp_path: Path, layers: dict | None = None):
     from fastapi.testclient import TestClient
 
-    rel = {
-        "sar_before": "sar/b.tif", "sar_after": "sar/a.tif",
-        "flood_extent": "sar/f.tif", "permanent_water": "context/pw.tif",
-        "urban": "context/urb.tif", "susceptibility": "terrain/s.tif",
-        "hand": "terrain/h.tif", "dem": "terrain/d.tif",
-    }
-    import app as appmod
-    appmod.LAYERS.update(rel)
+    rel = dict(TEST_LAYERS if layers is None else layers)
     for name, r in rel.items():
         _tiny_cog(tmp_path / r, -20.0)
-    (tmp_path / "vector").mkdir(parents=True)
+    (tmp_path / "vector").mkdir(parents=True, exist_ok=True)
     (tmp_path / "vector" / "municipalities_risk_may2024.geojson").write_text(
         json.dumps({"type": "FeatureCollection", "features": []}), encoding="utf-8"
     )
@@ -52,7 +52,12 @@ def client(tmp_path):
     (tmp_path / "vector" / "flood_polygons_may2024.geojson").write_text(
         json.dumps({"type": "FeatureCollection", "features": []}), encoding="utf-8"
     )
-    return TestClient(create_app(tmp_path))
+    return TestClient(create_app(tmp_path, layers=rel))
+
+
+@pytest.fixture()
+def client(tmp_path):
+    return _make_client(tmp_path)
 
 
 def test_layers_manifest(client):
@@ -110,13 +115,21 @@ def _read_png(content: bytes) -> np.ndarray:
         return ds.read()
 
 
-def test_tile_rescale_produces_contrast(client, tmp_path):
+def test_tile_bad_render_params_400(client):
+    assert client.get("/tiles/sar_before/8/91/150.png?rescale=abc").status_code == 400
+    assert client.get("/tiles/sar_before/8/91/150.png?colormap=not-json").status_code == 400
+
+
+def test_tile_bad_expression_400(client):
+    r = client.get("/tiles/sar_before/8/91/150.png?expression=b1%%%bogus(")
+    assert r.status_code == 400
+
+
+def test_tile_rescale_produces_contrast(tmp_path):
     # float32 dB raster: ?rescale=-30,0 must stretch values to distinct gray
     # levels. Regression: rescale was passed to render() as **kwargs, silently
     # dropped, and float32 fell back to dtype range -> uniform gray tile.
-    import app as appmod
-
-    appmod.LAYERS["sar_var"] = "sar/var.tif"
+    client = _make_client(tmp_path, {**TEST_LAYERS, "sar_var": "sar/var.tif"})
     arr = np.full((256, 256), -25.0, dtype="float32")
     arr[:, :128] = -5.0
     _write_cog(tmp_path / "sar/var.tif", arr)
@@ -130,12 +143,10 @@ def test_tile_rescale_produces_contrast(client, tmp_path):
     assert len(np.unique(gray)) >= 2
 
 
-def test_tile_colormap_string_keys(client, tmp_path):
+def test_tile_colormap_string_keys(tmp_path):
     # colormap arrives as JSON -> json.loads yields string keys; the API must
     # coerce them to numbers or no pixel matches and the tile is transparent.
-    import app as appmod
-
-    appmod.LAYERS["mask01"] = "sar/m.tif"
+    client = _make_client(tmp_path, {**TEST_LAYERS, "mask01": "sar/m.tif"})
     arr = np.zeros((256, 256), dtype="uint8")
     arr[:, :128] = 1
     _write_cog(tmp_path / "sar/m.tif", arr)

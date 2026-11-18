@@ -22,29 +22,42 @@ def to_db(linear: np.ndarray, nodata: float = np.nan) -> np.ndarray:
     return out
 
 
-def crop_to_aoi(url: str, aoi: AOI, out: Path) -> Path:
-    """Crop a raster (local path or URL) to the AOI bbox; nodata-fills partial overlap."""
-    out = Path(out)
-    out.parent.mkdir(parents=True, exist_ok=True)
+def _read_aoi_window(url: str, aoi: AOI):
+    """Read band 1 clipped to the AOI bbox; returns (data, transform, crs).
+
+    boundless=True: partial overlap fills with NaN outside the source.
+    """
     with rasterio.open(url) as src:
         bounds = transform_bounds(f"EPSG:{aoi.epsg}", src.crs, *aoi.bbox)
         window = from_bounds(*bounds, transform=src.transform)
         data = src.read(1, window=window, boundless=True, fill_value=np.nan)
-        transform = src.window_transform(window)
-        profile = {
-            "driver": "COG",
-            "height": data.shape[0],
-            "width": data.shape[1],
-            "count": 1,
-            "dtype": "float32",
-            "crs": src.crs,
-            "transform": transform,
-            "nodata": np.nan,
-            "compress": "deflate",
-        }
-        with rasterio.open(out, "w", **profile) as dst:
-            dst.write(np.asarray(data, dtype="float32"), 1)
+        return np.asarray(data, dtype="float32"), src.window_transform(window), src.crs
+
+
+def _write_cog(data: np.ndarray, transform, crs, out: Path) -> Path:
+    out = Path(out)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    with rasterio.open(
+        out,
+        "w",
+        driver="COG",
+        height=data.shape[0],
+        width=data.shape[1],
+        count=1,
+        dtype="float32",
+        crs=crs,
+        transform=transform,
+        nodata=np.nan,
+        compress="deflate",
+    ) as dst:
+        dst.write(data, 1)
     return out
+
+
+def crop_to_aoi(url: str, aoi: AOI, out: Path) -> Path:
+    """Crop a raster (local path or URL) to the AOI bbox; nodata-fills partial overlap."""
+    data, transform, crs = _read_aoi_window(url, aoi)
+    return _write_cog(data, transform, crs, out)
 
 
 def _band_url(scene: Scene, band: str) -> str:
@@ -56,15 +69,10 @@ def _band_url(scene: Scene, band: str) -> str:
 
 
 def process_scene(scene: Scene, band: str, aoi: AOI, out_dir: Path) -> Path:
+    """Crop + linear->dB + write in one pass (no read-rewrite round trip)."""
     out_dir = Path(out_dir)
     out = out_dir / f"{scene.id}_{band}_db.tif"
-    url = _band_url(scene, band)
-    crop_to_aoi(url, aoi, out)
-    with rasterio.open(out) as ds:
-        linear = ds.read(1)
-        profile = ds.profile
-    db = to_db(linear)
-    with rasterio.open(out, "w", **profile) as dst:
-        dst.write(db.astype("float32"), 1)
+    linear, transform, crs = _read_aoi_window(_band_url(scene, band), aoi)
+    _write_cog(to_db(linear), transform, crs, out)
     logger.info("processed %s band %s -> %s", scene.id, band, out)
     return out

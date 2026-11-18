@@ -12,7 +12,6 @@ Output: data/reports/may2024_validation.md (regenerable).
 import argparse
 import logging
 import math
-import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -24,17 +23,14 @@ from pystac_client import Client
 from rasterio.warp import Resampling, reproject, transform_bounds
 from rasterio.windows import from_bounds
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-
 from pipeline.aoi import get_aoi
 from pipeline.metrics import confusion_counts, f1, iou, summarize
+from pipeline.stac import PC_STAC_URL, scene_datetime_from_id
 from pipeline.water import water_mask
 
-logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 logger = logging.getLogger("validate_flood")
 
 DATA = Path(__file__).resolve().parents[2] / "data"
-PC_URL = "https://planetarycomputer.microsoft.com/api/stac/v1"
 CLOUD_SCL = {0, 3, 8, 9, 10, 11}  # nodata, shadow, cloud med/high, cirrus, snow
 CHIP_DEG = 0.05
 FLOOD_STRATUM_MIN = 0.05  # chip is "flood" stratum when >=5% of valid px are S2 water
@@ -52,18 +48,11 @@ def parse_args() -> argparse.Namespace:
     return p.parse_args()
 
 
-def sar_date_from_name(name: str) -> datetime | None:
-    m = re.search(r"(\d{8})T\d{6}", name)
-    if not m:
-        return None
-    return datetime.strptime(m.group(1), "%Y%m%d").replace(tzinfo=timezone.utc)
-
-
 def find_s2_items(bbox, start, end, sar_date, max_items=2):
     """Best S2 references: closest in time to the SAR scene, overlap > 20%, cloud < 40%."""
     from shapely.geometry import box, shape
 
-    catalog = Client.open(PC_URL)
+    catalog = Client.open(PC_STAC_URL)
     search = catalog.search(
         collections=["sentinel-2-l2a"],
         bbox=list(bbox),
@@ -103,6 +92,78 @@ def stratum_of(s2_water_frac: float) -> str:
     return "flood" if s2_water_frac >= FLOOD_STRATUM_MIN else "dry"
 
 
+def read_s2_chip(item, chip):
+    """B03/B08/SCL arrays for one chip on the shared B03 (10 m) grid.
+
+    Returns (ndwi, s2_water, valid, dst_transform, dst_crs) or None when the
+    chip is empty or >70% cloudy.
+    """
+    bounds_utm = transform_bounds(4326, "EPSG:32722", *chip)
+    b03, t3, s2_crs = read_window(item.assets["B03"].href, bounds_utm)
+    b08, _, _ = read_window(item.assets["B08"].href, bounds_utm)
+    scl, t_scl, scl_crs = read_window(item.assets["SCL"].href, bounds_utm)
+    if b03.size == 0 or scl.size == 0:
+        return None
+    # SCL is 20 m; align it to the 10 m B03 grid
+    scl_al = np.zeros(b03.shape, dtype="float32")
+    reproject(
+        scl.astype("float32"), scl_al,
+        src_transform=t_scl, src_crs=scl_crs,
+        dst_transform=t3, dst_crs=s2_crs,
+        resampling=Resampling.nearest, src_nodata=0, dst_nodata=0,
+    )
+    scl = scl_al.astype("uint8")
+    if np.isin(scl, list(CLOUD_SCL)).mean() > 0.7:
+        return None
+
+    ndwi = np.where((b03 + b08) > 0, (b03 - b08) / (b03 + b08), np.nan)
+    s2_water = (ndwi > 0.15) & ~np.isin(scl, list(CLOUD_SCL))
+    valid = ~np.isin(scl, list(CLOUD_SCL)) & ~np.isnan(ndwi)
+    if int(valid.sum()) == 0:
+        return None
+    return ndwi, s2_water, valid, t3, s2_crs
+
+
+def sar_db_on_chip(sar_tif, chip, dst_transform, dst_crs, dst_shape) -> np.ndarray:
+    """SAR dB reprojected onto the S2 chip grid (NaN outside the scene)."""
+    with rasterio.open(sar_tif) as sar:
+        sar_win = from_bounds(
+            *transform_bounds(4326, sar.crs, *chip), transform=sar.transform
+        )
+        sar_db = sar.read(1, window=sar_win, boundless=True, fill_value=np.nan)
+        sar_transform = sar.window_transform(sar_win)
+        sar_crs = sar.crs
+    out = np.zeros(dst_shape, dtype="float32")
+    reproject(
+        sar_db, out,
+        src_transform=sar_transform, src_crs=sar_crs,
+        dst_transform=dst_transform, dst_crs=dst_crs,
+        resampling=Resampling.nearest, src_nodata=np.nan, dst_nodata=np.nan,
+    )
+    return out
+
+
+def chip_threshold_rows(item_id, chip, strat, s2_water, valid, sar_db_chip) -> list[dict]:
+    """One confusion-counts row per threshold for an evaluable chip."""
+    out = []
+    for thr in THRESHOLDS:
+        sar_water = water_mask(sar_db_chip, thr)
+        tp, fp, fn, tn = confusion_counts(s2_water, sar_water, valid)
+        out.append(
+            {
+                "item": item_id,
+                "chip": chip,
+                "stratum": strat,
+                "thr": thr,
+                "valid_px": int(valid.sum()),
+                "s2_water_px": int((s2_water & valid).sum()),
+                "sar_water_px": int((sar_water & valid).sum()),
+                "counts": (tp, fp, fn, tn),
+            }
+        )
+    return out
+
+
 def collect_chips(aoi, items, sar_tif, n_chips, seed):
     """Stratified sample of evaluable chips; returns per-chip threshold rows."""
     rng = np.random.default_rng(seed)
@@ -125,73 +186,21 @@ def collect_chips(aoi, items, sar_tif, n_chips, seed):
             min_lat = rng.uniform(lo[1], hi[1] - CHIP_DEG)
             chip = (min_lon, min_lat, min_lon + CHIP_DEG, min_lat + CHIP_DEG)
 
-            b03, t3, s2_crs = read_window(
-                item.assets["B03"].href, transform_bounds(4326, "EPSG:32722", *chip)
-            )
-            b08, _, _ = read_window(
-                item.assets["B08"].href, transform_bounds(4326, "EPSG:32722", *chip)
-            )
-            scl, t_scl, scl_crs = read_window(
-                item.assets["SCL"].href, transform_bounds(4326, "EPSG:32722", *chip)
-            )
-            if b03.size == 0 or scl.size == 0:
+            s2 = read_s2_chip(item, chip)
+            if s2 is None:
                 continue
-            # SCL is 20 m; align it to the 10 m B03 grid
-            scl_al = np.zeros(b03.shape, dtype="float32")
-            reproject(
-                scl.astype("float32"), scl_al,
-                src_transform=t_scl, src_crs=scl_crs,
-                dst_transform=t3, dst_crs=s2_crs,
-                resampling=Resampling.nearest, src_nodata=0, dst_nodata=0,
-            )
-            scl = scl_al.astype("uint8")
-            if np.isin(scl, list(CLOUD_SCL)).mean() > 0.7:
-                continue
-
-            ndwi = np.where((b03 + b08) > 0, (b03 - b08) / (b03 + b08), np.nan)
-            s2_water = (ndwi > 0.15) & ~np.isin(scl, list(CLOUD_SCL))
-            valid = ~np.isin(scl, list(CLOUD_SCL)) & ~np.isnan(ndwi)
-            if int(valid.sum()) == 0:
-                continue
+            _, s2_water, valid, t3, s2_crs = s2
 
             water_frac = float((s2_water & valid).sum() / valid.sum())
             strat = stratum_of(water_frac)
             if quotas[strat] <= 0:
                 continue
 
-            # SAR after-water mask reprojected onto the S2 chip grid
-            with rasterio.open(sar_tif) as sar:
-                sar_win = from_bounds(
-                    *transform_bounds(4326, sar.crs, *chip), transform=sar.transform
-                )
-                sar_db = sar.read(1, window=sar_win, boundless=True, fill_value=np.nan)
-                sar_transform = sar.window_transform(sar_win)
-                sar_crs = sar.crs
-            sar_db_chip = np.zeros(s2_water.shape, dtype="float32")
-            reproject(
-                sar_db, sar_db_chip,
-                src_transform=sar_transform, src_crs=sar_crs,
-                dst_transform=t3, dst_crs=s2_crs,
-                resampling=Resampling.nearest, src_nodata=np.nan, dst_nodata=np.nan,
-            )
+            sar_db_chip = sar_db_on_chip(sar_tif, chip, t3, s2_crs, s2_water.shape)
             # SAR nodata can't vote either
             valid = valid & ~np.isnan(sar_db_chip)
 
-            for thr in THRESHOLDS:
-                sar_water = water_mask(sar_db_chip, thr)
-                tp, fp, fn, tn = confusion_counts(s2_water, sar_water, valid)
-                rows.append(
-                    {
-                        "item": item.id,
-                        "chip": chip,
-                        "stratum": strat,
-                        "thr": thr,
-                        "valid_px": int(valid.sum()),
-                        "s2_water_px": int((s2_water & valid).sum()),
-                        "sar_water_px": int((sar_water & valid).sum()),
-                        "counts": (tp, fp, fn, tn),
-                    }
-                )
+            rows += chip_threshold_rows(item.id, chip, strat, s2_water, valid, sar_db_chip)
             quotas[strat] -= 1
             n_stratum += 1
             logger.info(
@@ -263,13 +272,17 @@ def render_report(rows: list[dict], sar_tif_name: str, item_info: list[str]) -> 
 
 
 def main() -> int:
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
     args = parse_args()
     aoi = get_aoi("guaiba")
-    after_tif = next((DATA / "sar").glob("*2024051*vv_db.tif"), None) or next(
-        (DATA / "sar").glob("*_vv_db.tif")
+    wet_tif = next((DATA / "sar").glob("*2024051*vv_db.tif"), None) or next(
+        (DATA / "sar").glob("*_vv_db.tif"), None
     )
-    logger.info("SAR after-scene: %s", after_tif.name)
-    sar_date = sar_date_from_name(after_tif.name) or datetime(2024, 5, 11, tzinfo=timezone.utc)
+    if wet_tif is None:
+        logger.error("no SAR scene in %s — run build_may2024.py first", DATA / "sar")
+        return 1
+    logger.info("SAR wet-scene: %s", wet_tif.name)
+    sar_date = scene_datetime_from_id(wet_tif.name) or datetime(2024, 5, 11, tzinfo=timezone.utc)
     logger.info("SAR scene date: %s", sar_date.date())
 
     items = find_s2_items(aoi.bbox, "2024-05-05", "2024-05-31", sar_date, args.max_items)
@@ -284,13 +297,13 @@ def main() -> int:
         f"{i.properties.get('eo:cloud_cover', -1):.1f}% cloud)"
         for i in items
     ]
-    rows = collect_chips(aoi, items, after_tif, args.chips, args.seed)
+    rows = collect_chips(aoi, items, wet_tif, args.chips, args.seed)
     if not rows:
         logger.warning("no evaluable chips collected")
         return 0
 
     args.report.parent.mkdir(parents=True, exist_ok=True)
-    args.report.write_text(render_report(rows, after_tif.name, item_info), encoding="utf-8")
+    args.report.write_text(render_report(rows, wet_tif.name, item_info), encoding="utf-8")
     logger.info("report -> %s (%d chips)", args.report, len({r["chip"] for r in rows}))
     return 0
 

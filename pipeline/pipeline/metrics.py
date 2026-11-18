@@ -30,15 +30,19 @@ def agreement(tp: int, fp: int, fn: int, tn: int) -> float:
     return (tp + tn) / n if n else float("nan")
 
 
-def f1(tp: int, fp: int, fn: int) -> float:
-    """F1 of the water class. Both-empty => perfect (1.0); one-side-only water => 0.0."""
+def f1(tp: int, fp: int, fn: int, tn: int = 0) -> float:
+    """F1 of the water class. Both-empty => perfect (1.0); one-side-only water => 0.0.
+
+    tn is ignored — it exists so every metric shares the (tp, fp, fn, tn)
+    signature that bootstrap_ci/summarize call uniformly.
+    """
     denom = 2 * tp + fp + fn
     if denom == 0:
         return 1.0
     return 2 * tp / denom
 
 
-def iou(tp: int, fp: int, fn: int) -> float:
+def iou(tp: int, fp: int, fn: int, tn: int = 0) -> float:
     """Intersection-over-union of the water class. Same conventions as f1."""
     denom = tp + fp + fn
     if denom == 0:
@@ -104,8 +108,8 @@ def bootstrap_ci(
 def summarize(counts: list[tuple[int, int, int, int]]) -> dict:
     """All pooled metrics for a list of per-chip counts, plus bootstrap CIs."""
     tp, fp, fn, tn = pooled(counts)
-    f1_lo, f1_hi = bootstrap_ci(counts, lambda a, b, c, _tn: f1(a, b, c))
-    iou_lo, iou_hi = bootstrap_ci(counts, lambda a, b, c, _tn: iou(a, b, c))
+    f1_lo, f1_hi = bootstrap_ci(counts, f1)
+    iou_lo, iou_hi = bootstrap_ci(counts, iou)
     return {
         "tp": tp,
         "fp": fp,

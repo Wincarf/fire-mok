@@ -51,7 +51,7 @@ def test_flow_accumulation_channel_grows_downstream():
 
 def test_hand_zero_on_stream_and_positive_upslope():
     dem = valley_dem()
-    h = hand(dem, T30, acc_thresh_cells=150)
+    h = hand(dem, acc_thresh_cells=150)
     # channel is a stream well before x=60 (acc compounds past 150 early)
     assert float(h[50, 60]) == pytest.approx(0.0, abs=1e-3)
     # (20,30): elev 129; diagonal descent lands on the channel near x=59
@@ -65,7 +65,7 @@ def test_hand_zero_on_stream_and_positive_upslope():
 
 def test_hand_nan_without_streams():
     dem = valley_dem()
-    h = hand(dem, T30, acc_thresh_cells=100_000)
+    h = hand(dem, acc_thresh_cells=100_000)
     assert np.isnan(h).all()
 
 

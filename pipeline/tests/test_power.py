@@ -1,3 +1,5 @@
+import os
+
 import numpy as np
 import pytest
 
@@ -27,7 +29,7 @@ def test_parse_power_precip_drops_fill():
 
 
 def test_cross_check_precip_known_bias():
-    om = [10.0, 20.0, 30.0, 40.0]
+    om = {"a": 10.0, "b": 20.0, "c": 30.0, "d": 40.0}
     pw = {"a": 12.0, "b": 18.0, "c": 31.0, "d": 43.0}
     cc = cross_check_precip(om, pw)
     assert cc["n_overlap_days"] == 4
@@ -37,13 +39,24 @@ def test_cross_check_precip_known_bias():
     assert cc["max7d_power_mm"] == pytest.approx(104.0)
 
 
+def test_cross_check_precip_aligns_on_dates():
+    # OM drops a day POWER has (and vice versa): the join is on dates, not
+    # positions — a positional align would pair 30.0 with 32.0 off-by-one.
+    om = {"d1": 10.0, "d2": 20.0, "d3": 30.0, "d4": 40.0}
+    pw = {"d0": 99.0, "d1": 15.0, "d3": 33.0, "d4": 41.0}
+    cc = cross_check_precip(om, pw)
+    assert cc["n_overlap_days"] == 3
+    assert cc["bias_mm"] == pytest.approx((5 + 3 + 1) / 3)
+
+
 def test_cross_check_precip_empty_overlap():
-    cc = cross_check_precip([], {})
+    cc = cross_check_precip({}, {})
     assert cc["n_overlap_days"] == 0
     assert np.isnan(cc["bias_mm"])
     assert cc["max7d_open_meteo_mm"] == 0.0
 
 
+@pytest.mark.skipif(not os.environ.get("FIREMOK_LIVE"), reason="live NASA POWER API; set FIREMOK_LIVE=1 to run")
 def test_live_power_api_anchor_case():
     """May-2024 Guaíba point: POWER must show the storm days (live network)."""
     p = power_for_point(-30.03, -51.25, "2024-05-01", "2024-05-15")
