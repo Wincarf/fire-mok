@@ -24,8 +24,7 @@ NISAR L-band layers (backscatter, open water, C×L duet). API
 endpoints are mirrored as files (`/api/municipalities`, `/api/layers`,
 `/api/plan/{code}`, pre-rendered tiles z6–12).
 
-- URL: **https://wincarf.github.io/fire-mok/** (enable Pages under
-  *Settings → Pages → Deploy from a branch → gh-pages / root*)
+- URL: **https://wincarf.github.io/fire-mok/**
 - Regenerate: `cd web && npm run build -- --base=/fire-mok/`, then
   `cd pipeline && uv run python ../scripts/build_pages.py --dist ../web/dist
   --out ../pages_site --data ../data` (data in `data/` must exist).
