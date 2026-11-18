@@ -11,27 +11,26 @@ import rasterio.io
 from pystac_client import Client
 from rasterio.features import geometry_mask
 from rasterio.merge import merge
-from rasterio.warp import transform_bounds
+from rasterio.warp import Resampling, calculate_default_transform, reproject, transform_bounds
 from rasterio.windows import from_bounds
-
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from shapely.geometry import box
 
 from pipeline.aoi import get_aoi
 from pipeline.municipalities import load_municipalities
+from pipeline.raster import write_float32_cog
+from pipeline.stac import PC_STAC_URL
 from pipeline.terrain import hand, slope_deg, susceptibility, susceptibility_hand
 
-logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 logger = logging.getLogger("build_terrain")
 
 DATA = Path(__file__).resolve().parents[2] / "data"
-PC_URL = "https://planetarycomputer.microsoft.com/api/stac/v1"
 ELEV_THRESH_M = 50.0      # fallback rule (only if HAND fails): Guaíba plain ~0-30 m
 HAND_THRESH_M = 15.0      # HAND < 15 m ~ floodplain (Rennó et al. 2008)
 SLOPE_THRESH_DEG = 5.0
 
 
 def fetch_dem(aoi, out: Path) -> Path:
-    catalog = Client.open(PC_URL)
+    catalog = Client.open(PC_STAC_URL)
     search = catalog.search(collections=["cop-dem-glo-30"], bbox=list(aoi.bbox), max_items=10)
     items = list(search.items())
     if not items:
@@ -60,18 +59,13 @@ def fetch_dem(aoi, out: Path) -> Path:
         srcs.append(mem.open())
     dem, transform = merge(srcs)
     dem = dem[0]
-    out.parent.mkdir(parents=True, exist_ok=True)
-    with rasterio.open(
-        out, "w", driver="COG", height=dem.shape[0], width=dem.shape[1],
-        count=1, dtype="float32", crs=crs, transform=transform,
-        nodata=np.nan, compress="deflate",
-    ) as ds:
-        ds.write(dem.astype("float32"), 1)
+    write_float32_cog(dem, transform, crs, out)
     logger.info("DEM %s px, CRS %s -> %s", dem.shape, crs, out)
     return out
 
 
 def main() -> int:
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
     aoi = get_aoi("guaiba")
     ter_dir = DATA / "terrain"
     dem_path = ter_dir / "cop_dem_glo30_guaiba.tif"
@@ -83,8 +77,6 @@ def main() -> int:
         transform, crs = src.transform, src.crs
     if crs.is_geographic:
         # reproject DEM to metric UTM before slope (geomaster gate: units must agree)
-        from rasterio.warp import Resampling, calculate_default_transform, reproject
-
         dst_crs = "EPSG:32722"
         dst_transform, w, h = calculate_default_transform(crs, dst_crs, dem.shape[1], dem.shape[0], *src.bounds)
         dem_m = np.full((h, w), np.nan, dtype="float32")
@@ -97,12 +89,15 @@ def main() -> int:
 
     slope = slope_deg(dem, transform)
 
-    # HAND-based floodplain (Rennó 2008); fallback to elev+slope on failure
-    hand_arr = np.full(dem.shape, np.nan, dtype="float32")
+    # HAND-based floodplain (Rennó 2008); fallback to elev+slope on failure.
+    # hand_arr is computed once here and reused for the HAND raster + the mask.
+    hand_ok = False
     try:
-        hand_arr = hand(dem, transform, acc_thresh_cells=1000)
-        sus = (hand_arr < HAND_THRESH_M) & (slope < SLOPE_THRESH_DEG)
-        sus &= ~np.isnan(dem) & ~np.isnan(hand_arr) & ~np.isnan(slope)
+        hand_arr = hand(dem, acc_thresh_cells=1000)
+        sus = susceptibility_hand(
+            dem, transform, HAND_THRESH_M, SLOPE_THRESH_DEG, hand_arr=hand_arr
+        )
+        hand_ok = True
         logger.info("susceptibility: HAND < %.0f m (HAND range %.1f–%.1f m)",
                     HAND_THRESH_M, np.nanmin(hand_arr), np.nanmax(hand_arr))
     except Exception as exc:
@@ -110,12 +105,10 @@ def main() -> int:
         logger.warning("HAND failed (%s) — fell back to elev<%.0f m + slope", exc, ELEV_THRESH_M)
 
     hand_path = ter_dir / "hand_guaiba.tif"
-    with rasterio.open(
-        hand_path, "w", driver="COG", height=hand_arr.shape[0], width=hand_arr.shape[1],
-        count=1, dtype="float32", crs=crs, transform=transform, nodata=np.nan,
-        compress="deflate",
-    ) as ds:
-        ds.write(hand_arr, 1)
+    if hand_ok:
+        write_float32_cog(hand_arr, transform, crs, hand_path)
+    else:
+        logger.warning("skipping %s — HAND unavailable", hand_path)
 
     sus_path = ter_dir / "susceptibility_guaiba.tif"
     with rasterio.open(
@@ -129,7 +122,7 @@ def main() -> int:
     )
 
     muni = load_municipalities().to_crs(crs)
-    aoi_box = __import__("shapely.geometry", fromlist=["box"]).box(*aoi.bbox)
+    aoi_box = box(*aoi.bbox)
     rows = []
     for _, m in muni[muni.to_crs(4326).intersects(aoi_box)].iterrows():
         inside = geometry_mask([m.geometry], out_shape=sus.shape, transform=transform, invert=True)

@@ -1,10 +1,12 @@
 import type { Vis } from "../vis";
-import { SAR_PLATFORM } from "../format";
+import { fmtInt, SAR_PLATFORM } from "../format";
+import { RISK_CATEGORIES, RISK_CHIP } from "../risk";
+import type { MuniSummary } from "../stats";
 
 type Props = {
   layers: Vis;
   onToggle: (k: keyof Vis, v: boolean) => void;
-  summary: { exposed: number; critical: number };
+  summary: MuniSummary;
   lastPass: string;
   nisarReady?: boolean;
 };
@@ -16,13 +18,6 @@ const LAYERS: { key: keyof Vis; name: string; chip: string; dot: string; gate?: 
   { key: "nisarHh", name: "NISAR backscatter (L-band)", chip: "NISAR", dot: "bg-tertiary-container", gate: "nisar_hh" },
   { key: "nisarWater", name: "NISAR open water (L-band)", chip: "NISAR", dot: "bg-[#22d3ee]", gate: "nisar_hh" },
   { key: "nisarDiff", name: "Duet: L sees, C can't", chip: "C×L", dot: "bg-[#f97316]", gate: "nisar_diff" },
-];
-
-const RISK = [
-  { label: "critical", cls: "bg-[#ef4444]" },
-  { label: "high", cls: "bg-[#f97316]" },
-  { label: "moderate", cls: "bg-[#facc15]" },
-  { label: "low", cls: "bg-[#94a3b8]" },
 ];
 
 export function LayersDrawer({ layers, onToggle, summary, lastPass, nisarReady }: Props) {
@@ -69,10 +64,10 @@ export function LayersDrawer({ layers, onToggle, summary, lastPass, nisarReady }
             Municipal risk
           </span>
           <div className="mt-space-xs grid grid-cols-2 gap-space-xs">
-            {RISK.map((r) => (
-              <span key={r.label} className="flex items-center gap-space-xs font-label-mono-xs text-label-mono-xs text-on-surface-variant">
-                <i className={`w-2.5 h-2.5 rounded-sm ${r.cls}`} />
-                {r.label}
+            {RISK_CATEGORIES.map((r) => (
+              <span key={r} className="flex items-center gap-space-xs font-label-mono-xs text-label-mono-xs text-on-surface-variant">
+                <i className={`w-2.5 h-2.5 rounded-sm ${RISK_CHIP[r]}`} />
+                {r}
               </span>
             ))}
           </div>
@@ -85,7 +80,7 @@ export function LayersDrawer({ layers, onToggle, summary, lastPass, nisarReady }
           <div className="mt-space-xs p-space-sm rounded-lg bg-surface-container-low">
             <div className="flex items-baseline justify-between">
               <span className="font-metric-lg text-metric-lg text-on-surface">
-                ~{summary.exposed.toLocaleString("en-US")}
+                ~{fmtInt(summary.exposed)}
               </span>
               <span className="font-label-mono-xs text-label-mono-xs text-tertiary-container font-semibold uppercase">
                 {summary.critical} at critical risk

@@ -12,8 +12,13 @@ import numpy as np
 import rasterio
 import requests
 from rasterio.transform import from_origin
+from rasterio.warp import Resampling, reproject, transform_bounds
+from rasterio.windows import Window, bounds as win_bounds, from_bounds
 
+from pipeline.masks import fetch_worldcover_for_bounds
+from pipeline.raster import write_float32_cog, write_mask_cog
 from pipeline.types import Scene
+from pipeline.water import filter_min_area
 
 logger = logging.getLogger(__name__)
 
@@ -74,15 +79,26 @@ def search_nisar_gcov(
     scenes = []
     for r in results:
         p = r.properties
+        footprint = _result_bounds(r)
         scenes.append(
             Scene(
                 id=p.get("fileID") or p.get("sceneName") or p.get("fileName") or "nisar",
                 datetime=str(p.get("startTime", "")),
                 url=p.get("url", ""),
-                bbox=bbox,
+                bbox=footprint,
             )
         )
     return scenes
+
+
+def _result_bounds(result) -> tuple[float, float, float, float] | None:
+    """Scene footprint bounds from the ASF result geometry, if present."""
+    geom = getattr(result, "geometry", None)
+    if not geom:
+        return None
+    from shapely.geometry import shape  # lazy: keeps h5py-only users free of shapely
+
+    return tuple(shape(geom).bounds)
 
 
 def download_gcov(scene: Scene, session: "asf.ASFSession", out_dir: Path) -> Path:
@@ -126,22 +142,7 @@ def gcov_to_cog(h5_path: Path, pol: str = "HHHH", out: Path | None = None) -> Pa
 
     db = np.where(data > 0, 10.0 * np.log10(np.asarray(data, dtype="float32")), np.nan)
 
-    out.parent.mkdir(parents=True, exist_ok=True)
-    with rasterio.open(
-        out,
-        "w",
-        driver="COG",
-        height=data.shape[0],
-        width=data.shape[1],
-        count=1,
-        dtype="float32",
-        crs=epsg,
-        transform=transform,
-        nodata=np.nan,
-        compress="deflate",
-    ) as dst:
-        dst.write(db.astype("float32"), 1)
-    return out
+    return write_float32_cog(db, transform, f"EPSG:{epsg}", out)
 
 
 def summarize_lband_db(values: np.ndarray) -> dict:
@@ -169,9 +170,6 @@ def summarize_lband_db(values: np.ndarray) -> dict:
 
 def lband_stats_over_bbox(cog_path: Path, bbox: tuple[float, float, float, float]) -> dict:
     """Read the GCOV dB COG inside a lon/lat bbox and summarize it."""
-    from rasterio.warp import transform_bounds
-    from rasterio.windows import Window, from_bounds
-
     with rasterio.open(cog_path) as src:
         left, bottom, right, top = transform_bounds(
             "EPSG:4326", src.crs, *bbox, densify_pts=21
@@ -210,7 +208,6 @@ def lband_water_mask(
     min_px: int = 25,
 ) -> np.ndarray:
     """Open-water proxy: σ0 below thresh, minus urban/permanent-water context."""
-    from pipeline.water import filter_min_area
 
     w = np.isfinite(db) & (db < thresh_db)
     if urban is not None:
@@ -247,12 +244,6 @@ def duet_products(
     Best-effort by design: missing WorldCover coverage or a missing S1
     extent only removes parts of the result, never raises.
     """
-    from rasterio.warp import Resampling, reproject, transform_bounds
-    from rasterio.windows import Window, bounds as win_bounds, from_bounds
-
-    from pipeline.masks import fetch_worldcover_for_bounds
-    from pipeline.water import filter_min_area, write_mask_cog
-
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     with rasterio.open(hh_cog) as src:

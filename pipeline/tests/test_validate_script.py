@@ -3,6 +3,7 @@ import sys
 from pathlib import Path
 
 from pipeline.metrics import f1
+from pipeline.stac import scene_datetime_from_id
 
 # import the script module (scripts/ is not a package)
 _spec = importlib.util.spec_from_file_location(
@@ -13,10 +14,10 @@ sys.modules["validate_flood"] = vf
 _spec.loader.exec_module(vf)
 
 
-def test_sar_date_from_name():
-    d = vf.sar_date_from_name("S1A_IW_GRDH_1SDV_20240511T084943_20240511T085008_053821_068A6E_rtc_vv_db.tif")
+def test_scene_datetime_from_id():
+    d = scene_datetime_from_id("S1A_IW_GRDH_1SDV_20240511T084943_20240511T085008_053821_068A6E_rtc_vv_db.tif")
     assert d is not None and (d.year, d.month, d.day) == (2024, 5, 11)
-    assert vf.sar_date_from_name("no_date_here.tif") is None
+    assert scene_datetime_from_id("no_date_here.tif") is None
 
 
 def test_stratum_of():

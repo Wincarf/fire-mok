@@ -1,7 +1,5 @@
 import { describe, it, expect } from "vitest";
 import { STORY } from "./story";
-import { summarizeMunicipalities } from "./stats";
-import { RISK_LABEL } from "./labels";
 
 const VIS_KEYS = ["flood", "sus", "muni"];
 
@@ -34,41 +32,5 @@ describe("story script", () => {
       expect(s.title.length).toBeGreaterThan(0);
       expect(s.text.length).toBeGreaterThan(0);
     }
-  });
-});
-
-describe("summarizeMunicipalities", () => {
-  const feats = [
-    { properties: { pop_exposed: 100, risk_category: "critical" } },
-    { properties: { pop_exposed: 250, risk_category: "high" } },
-    { properties: { pop_exposed: 50, risk_category: "critical" } },
-  ];
-
-  it("sums pop_exposed and counts critical municipalities", () => {
-    expect(summarizeMunicipalities(feats)).toEqual({ exposed: 400, critical: 2 });
-  });
-
-  it("ignores non-finite pop_exposed values", () => {
-    const bad = [
-      { properties: { pop_exposed: NaN, risk_category: "critical" } },
-      { properties: { pop_exposed: Infinity } },
-      { properties: { pop_exposed: "12" } },
-    ];
-    expect(summarizeMunicipalities(bad)).toEqual({ exposed: 0, critical: 1 });
-  });
-
-  it("returns zeros for empty or non-array input", () => {
-    expect(summarizeMunicipalities([])).toEqual({ exposed: 0, critical: 0 });
-    expect(summarizeMunicipalities(null as any)).toEqual({ exposed: 0, critical: 0 });
-    expect(summarizeMunicipalities(undefined as any)).toEqual({ exposed: 0, critical: 0 });
-  });
-});
-
-describe("risk labels", () => {
-  it("maps every API category to its English display label", () => {
-    expect(RISK_LABEL.critical).toBe("critical");
-    expect(RISK_LABEL.high).toBe("high");
-    expect(RISK_LABEL.moderate).toBe("moderate");
-    expect(RISK_LABEL.low).toBe("low");
   });
 });

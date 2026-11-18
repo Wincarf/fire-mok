@@ -11,47 +11,41 @@ from rio_tiler.io import COGReader
 from rio_tiler.models import ImageData
 
 DATA = Path(__file__).resolve().parents[1] / "data"
-
-LAYERS = {
-    "sar_before": "sar/S1A_IW_GRDH_1SDV_20240604T084924_20240604T084953_054171_069681_rtc_vv_db.tif",
-    "sar_after": "sar/S1A_IW_GRDH_1SDV_20240511T084943_20240511T085008_053821_068A6E_rtc_vv_db.tif",
-    "flood_extent": "sar/flood_extent_may2024.tif",
-    "permanent_water": "context/permanent_water_guaiba.tif",
-    "urban": "context/urban_guaiba.tif",
-    "susceptibility": "terrain/susceptibility_guaiba.tif",
-    "hand": "terrain/hand_guaiba.tif",
-    "dem": "terrain/cop_dem_glo30_guaiba.tif",
-    "choreo_peak": "sar/choreo_extent_20240511.tif",
-    "choreo_recession": "sar/choreo_extent_20240530.tif",
-    "choreo_calm": "sar/choreo_extent_20240604.tif",
-    "nisar_hh": "nisar/nisar_hh_db.tif",
-    "nisar_lwater": "nisar/nisar_lwater.tif",
-    "nisar_diff": "nisar/nisar_diff.tif",
-}
+MANIFEST = Path(__file__).resolve().parent / "layers.json"
 
 
-def create_app(data_dir: Path | None = None) -> FastAPI:
+def _load_manifest() -> dict:
+    """Single layer registry (name -> {path, render, prerender}) shared with
+    scripts/build_pages.py and the web app — no hand-mirrored copies."""
+    return json.loads(MANIFEST.read_text(encoding="utf-8"))
+
+
+LAYERS = {k: v["path"] for k, v in _load_manifest().items()}
+
+
+def create_app(data_dir: Path | None = None, layers: dict | None = None) -> FastAPI:
     data = Path(data_dir) if data_dir else DATA
+    registry = dict(LAYERS if layers is None else layers)
     app = FastAPI(title="Fire Mok")
     app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"])
 
     def layer_path(layer: str) -> Path:
-        if layer not in LAYERS:
+        if layer not in registry:
             raise HTTPException(404, f"unknown layer '{layer}'")
-        p = data / LAYERS[layer]
+        p = data / registry[layer]
         if not p.exists():
             raise HTTPException(404, f"layer file missing: {p.name}")
         return p
 
     @app.get("/healthz")
     def healthz():
-        available = sum(1 for rel in LAYERS.values() if (data / rel).exists())
-        return {"status": "ok", "layers_available": available, "layers_total": len(LAYERS)}
+        available = sum(1 for rel in registry.values() if (data / rel).exists())
+        return {"status": "ok", "layers_available": available, "layers_total": len(registry)}
 
     @app.get("/api/layers")
     def layers():
         out = []
-        for name, rel in LAYERS.items():
+        for name, rel in registry.items():
             p = data / rel
             entry = {"id": name, "available": p.exists()}
             if p.exists():
@@ -72,19 +66,30 @@ def create_app(data_dir: Path | None = None) -> FastAPI:
         path = layer_path(layer)
         from rio_tiler.errors import TileOutsideBounds
 
+        # render params are user input — validate up front -> 400, not 500
+        try:
+            rescale_vals = [tuple(map(float, rescale.split(",")))] if rescale else None
+            # json keys are strings; pixels match numeric keys only
+            cmap = (
+                {float(k): tuple(v) for k, v in json.loads(colormap).items()}
+                if colormap else None
+            )
+        except (ValueError, TypeError, json.JSONDecodeError) as exc:
+            raise HTTPException(400, f"invalid rescale/colormap: {exc}") from exc
+
         try:
             with COGReader(str(path)) as cog:
                 img = cog.tile(x, y, z, expression=expression)
         except TileOutsideBounds:
             raise HTTPException(404, "tile outside dataset bounds")
+        except Exception as exc:
+            if expression is not None:
+                raise HTTPException(400, f"invalid expression: {exc}") from exc
+            raise
         if str(img.array.dtype) == "bool":  # mask expressions render as 0/1
             img = ImageData(img.array.astype("uint8"), assets=img.assets, crs=img.crs, bounds=img.bounds)
-        if rescale:  # stretch data to uint8 — render() has no rescale kwarg
-            img = img.rescale([tuple(map(float, rescale.split(",")))])
-        cmap = (
-            {float(k): tuple(v) for k, v in json.loads(colormap).items()}
-            if colormap else None
-        )  # json keys are strings; pixels match numeric keys only
+        if rescale_vals:  # stretch data to uint8 — render() has no rescale kwarg
+            img = img.rescale(rescale_vals)
         png = img.render(img_format="PNG", colormap=cmap)
         return Response(content=png, media_type="image/png")
 
@@ -130,7 +135,7 @@ def create_app(data_dir: Path | None = None) -> FastAPI:
             raise HTTPException(404, "nisar product not built")
         return json.loads(p.read_text(encoding="utf-8"))
 
-    @app.api_route("/api/flood_polygons", methods=["GET", "HEAD"])  # HEAD: web usa para habilitar export
+    @app.api_route("/api/flood_polygons", methods=["GET", "HEAD"])  # HEAD: web checks it to enable export
     def flood_polygons():
         p = data / "vector" / "flood_polygons_may2024.geojson"
         if not p.exists():

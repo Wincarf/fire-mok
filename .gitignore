@@ -22,3 +22,10 @@ dist/
 
 # worktrees
 .worktrees/
+
+# desloppify local state
+.desloppify/
+scorecard.png
+
+# agent temp workspace
+.tmp_stitch/

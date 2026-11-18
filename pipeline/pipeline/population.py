@@ -18,7 +18,10 @@ from pathlib import Path
 
 import numpy as np
 import rasterio
-from rasterio.warp import Resampling, reproject
+from rasterio.warp import Resampling, reproject, transform_bounds
+from rasterio.windows import from_bounds
+
+from pipeline.raster import reproject_to_grid, write_float32_cog
 
 logger = logging.getLogger(__name__)
 
@@ -32,26 +35,19 @@ def density_from_counts(
 ) -> np.ndarray | None:
     """Count-preserving density (people per dst pixel) from a count raster.
 
-    Counts -> density (pop/m²) -> average-resample onto dst grid -> scale back
-    to per-pixel counts, so any resolution change keeps totals invariant.
+    GDAL's sum resample area-weights contributing source pixels, so totals
+    survive CRS and resolution changes — mixing transform units (deg² vs m²)
+    in a manual density conversion would corrupt them instead.
     Non-populated/nodata source cells are zero-filled (0 people — conservative
-    for exposure) instead of NaN, because GDAL's average ignores NaN without
-    area weighting and totals would inflate on coarser grids.
+    for exposure) instead of NaN, which sum resampling would propagate.
     """
-    src_px_area = abs(src_transform.a * src_transform.e)
-    dst_px_area = abs(dst_transform.a * dst_transform.e)
-    c = np.where(np.isnan(counts), 0.0, counts).astype("float32")
+    c = np.where(np.isnan(counts) | (counts < 0), 0.0, counts).astype("float32")
     if c.max() <= 0:
         return None
-    density_src = c / src_px_area
-    density_dst = np.full(dst_shape, np.nan, dtype="float32")
-    reproject(
-        density_src, density_dst,
-        src_transform=src_transform, src_crs=src_crs,
-        dst_transform=dst_transform, dst_crs=dst_crs,
-        resampling=Resampling.average, src_nodata=np.nan, dst_nodata=np.nan,
+    return reproject_to_grid(
+        c, src_transform, src_crs, dst_transform, dst_crs,
+        dst_shape, resampling=Resampling.sum,
     )
-    return density_dst * dst_px_area  # people per dst pixel
 
 
 def fetch_pop_density_grid(
@@ -69,21 +65,11 @@ def fetch_pop_density_grid(
                 counts, transform, crs = src.read(1), src.transform, src.crs
         else:
             with rasterio.open(f"/vsicurl/{WORLDPOP_URL}") as src:
-                from rasterio.windows import from_bounds
-                from rasterio.warp import transform_bounds
-
                 win = from_bounds(*bbox_4326, transform=src.transform)
                 counts = src.read(1, window=win, boundless=True, fill_value=src.nodata or 0)
                 transform = src.window_transform(win)
                 crs = src.crs
-                cache_path.parent.mkdir(parents=True, exist_ok=True)
-                profile = {
-                    "driver": "COG", "height": counts.shape[0], "width": counts.shape[1],
-                    "count": 1, "dtype": "float32", "crs": crs, "transform": transform,
-                    "nodata": np.nan, "compress": "deflate",
-                }
-                with rasterio.open(cache_path, "w", **profile) as dst:
-                    dst.write(counts.astype("float32"), 1)
+                write_float32_cog(counts, transform, crs, cache_path)
         return density_from_counts(counts, transform, crs, dst_transform, dst_crs, dst_shape)
     except Exception as exc:
         logger.warning("population grid unavailable (%s) — uniform-density fallback", exc)

@@ -4,24 +4,20 @@ Actions are driven by the risk category plus which component fired.
 Strings are English — they reach the UI and the manager-facing report.
 """
 
-SEVERITY_ORDER = ["low", "moderate", "high", "critical"]
+from pipeline.types import MuniFeatures, RiskCategory
+from pipeline.util import num_or
+
+SEVERITY_ORDER: list[RiskCategory] = ["low", "moderate", "high", "critical"]
 
 
-def _num(m: dict, key: str, default: float = 0.0) -> float:
-    """GeoJSON round-trips turn NaN/None into strings or null — coerce to a
-    finite number so the rule comparisons never crash on unknown values."""
-    try:
-        x = float(m.get(key, default))
-    except (TypeError, ValueError):
-        return default
-    return default if x != x else x  # nan != nan
+def build_action_plan(m: MuniFeatures) -> dict:
+    def _num(key: str, default: float = 0.0) -> float:
+        return num_or(m.get(key, default), default)
 
-
-def build_action_plan(m: dict) -> dict:
     cat = m.get("risk_category", "low")
     actions: list[str] = []
     reasons: list[str] = []
-    pop_exposed = int(_num(m, "pop_exposed"))
+    pop_exposed = int(_num("pop_exposed"))
 
     if cat in ("high", "critical"):
         reasons.append(f"risk category {cat}")
@@ -42,23 +38,23 @@ def build_action_plan(m: dict) -> dict:
             "Update the hazard-area registry in the master plan",
         ]
 
-    flood_frac = _num(m, "flood_frac")
+    flood_frac = _num("flood_frac")
     if flood_frac > 0.02:
         reasons.append(f"{100*flood_frac:.1f}% of the municipal area with observed flooding")
         actions.append("Prioritize inspections and unclogging in sectors with water observed in the SAR")
-    precip_max7d = _num(m, "precip_max7d_mm")
+    precip_max7d = _num("precip_max7d_mm")
     if precip_max7d > 250:
         reasons.append(f"{precip_max7d:.0f} mm in 7 days")
         actions.append("Monitor river levels and reinforce the warning if intense rain returns")
-    precip_fc = _num(m, "precip_forecast_max7d_mm")
+    precip_fc = _num("precip_forecast_max7d_mm")
     if precip_fc > 100:
         reasons.append(f"forecast of {precip_fc:.0f} mm over the next 7 days")
         actions.append("Prepare a preventive alert for next week — forecast rain over already saturated soil")
-    soil = _num(m, "soil_moisture_mean")
+    soil = _num("soil_moisture_mean")
     if soil > 0.4:
         reasons.append("soil near saturation")
         actions.append("Watch slopes and infiltration areas — saturated soil reduces absorption")
-    sus_frac = _num(m, "sus_frac")
+    sus_frac = _num("sus_frac")
     if sus_frac > 0.5:
         reasons.append(f"{100*sus_frac:.0f}% of the territory on low, flat terrain")
         actions.append("Review evacuation routes and meeting points in floodplain areas")

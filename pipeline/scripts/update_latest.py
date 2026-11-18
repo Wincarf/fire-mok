@@ -18,23 +18,26 @@ from pathlib import Path
 
 import numpy as np
 import rasterio
-from rasterio.warp import Resampling, reproject
-
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from pipeline.aoi import get_aoi
-from pipeline.masks import clean_flood_extent, fetch_worldcover_for_bounds
+from pipeline.masks import (
+    clean_flood_extent,
+    fetch_worldcover_for_bounds,
+    permanent_water_mask,
+    urban_mask,
+)
+from pipeline.raster import reproject_to_grid, write_mask_cog
 from pipeline.sar_process import process_scene
-from pipeline.sar_search import search_s1_rtc
+from pipeline.sar_search import scene_coverage, search_s1_rtc
+from pipeline.stac import scene_datetime_from_id
 from pipeline.types import Scene
-from pipeline.water import filter_min_area, flood_extent, mask_to_polygons, write_mask_cog
+from pipeline.water import DEFAULT_THRESH_DB, filter_min_area, flood_extent, mask_to_polygons
 
-logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 logger = logging.getLogger("update_latest")
 
 DATA = Path(__file__).resolve().parents[2] / "data"
 LOOKBACK_DAYS = 14
-THRESH_DB = -15.0
+THRESH_DB = DEFAULT_THRESH_DB
 
 
 def parse_args() -> argparse.Namespace:
@@ -47,34 +50,18 @@ def parse_args() -> argparse.Namespace:
     return p.parse_args()
 
 
-def sensing_time(scene_id: str) -> datetime | None:
-    m = re.search(r"(\d{8})T(\d{6})", scene_id)
-    if not m:
-        return None
-    return datetime.strptime(m.group(1) + m.group(2), "%Y%m%d%H%M%S").replace(tzinfo=timezone.utc)
-
-
 def pass_token(scene_id: str) -> str:
     """Sensing-start HHMM (same pass = same HHMM across days on the same orbit)."""
     m = re.search(r"(\d{8})T(\d{4})\d{2}", scene_id)
     return m.group(2) if m else ""
 
 
-def coverage(scene: Scene, aoi_bbox) -> float:
-    if not scene.bbox:
-        return 0.0
-    from shapely.geometry import box
-
-    target = box(*aoi_bbox)
-    return box(*scene.bbox).intersection(target).area / target.area
-
-
 def choose_pair(scenes: list[Scene], aoi_bbox, min_coverage: float = 0.99) -> tuple[Scene, Scene] | None:
     """(latest, baseline) pair: newest full-coverage scene + previous scene on
     the same pass. Returns None when fewer than two usable scenes exist."""
     usable = sorted(
-        (s for s in scenes if coverage(s, aoi_bbox) >= min_coverage and sensing_time(s.id)),
-        key=lambda s: sensing_time(s.id),
+        (s for s in scenes if scene_coverage(s, aoi_bbox) >= min_coverage and scene_datetime_from_id(s.id)),
+        key=lambda s: scene_datetime_from_id(s.id),
         reverse=True,
     )
     if len(usable) < 2:
@@ -87,18 +74,8 @@ def choose_pair(scenes: list[Scene], aoi_bbox, min_coverage: float = 0.99) -> tu
     return latest, baseline
 
 
-def align(src_arr, src_transform, src_crs, dst_transform, dst_crs, shape):
-    dst = np.full(shape, np.nan, dtype="float32")
-    reproject(
-        src_arr.astype("float32"), dst,
-        src_transform=src_transform, src_crs=src_crs,
-        dst_transform=dst_transform, dst_crs=dst_crs,
-        resampling=Resampling.bilinear, src_nodata=np.nan, dst_nodata=np.nan,
-    )
-    return dst
-
-
 def main() -> int:
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
     args = parse_args()
     aoi = get_aoi(args.aoi)
     end = datetime.now(timezone.utc)
@@ -118,38 +95,34 @@ def main() -> int:
             logger.info("no pair even with a 30-day lookback -> nothing to build")
             return 0
         logger.info("rebuilding reference extent with a 30-day lookback")
-    after, before = pair
-    logger.info("latest:  %s (%s)", after.id, after.datetime[:10])
-    logger.info("baseline: %s (%s)", before.id, before.datetime[:10])
+    latest, baseline = pair
+    logger.info("latest:   %s (%s)", latest.id, latest.datetime[:10])
+    logger.info("baseline: %s (%s)", baseline.id, baseline.datetime[:10])
     if args.dry_run:
         logger.info("dry-run: nothing processed")
         return 0
 
     sar_dir = DATA / "sar"
     vec_dir = DATA / "vector"
-    before_tif = sar_dir / f"{before.id}_{args.band}_db.tif"
-    after_tif = sar_dir / f"{after.id}_{args.band}_db.tif"
-    if not before_tif.exists():
-        process_scene(before, args.band, aoi, sar_dir)
-    if not after_tif.exists():
-        process_scene(after, args.band, aoi, sar_dir)
+    baseline_tif = sar_dir / f"{baseline.id}_{args.band}_db.tif"
+    latest_tif = sar_dir / f"{latest.id}_{args.band}_db.tif"
+    if not baseline_tif.exists():
+        process_scene(baseline, args.band, aoi, sar_dir)
+    if not latest_tif.exists():
+        process_scene(latest, args.band, aoi, sar_dir)
 
-    with rasterio.open(before_tif) as b:
-        before_db, profile = b.read(1), b.profile
+    with rasterio.open(baseline_tif) as b:
+        ref_db, profile = b.read(1), b.profile
         dst_transform, dst_crs = b.transform, b.crs
-    with rasterio.open(after_tif) as a:
-        after_db = a.read(1)
-    after_al = align(after_db, a.transform, a.crs, dst_transform, dst_crs, before_db.shape)
+    with rasterio.open(latest_tif) as a:
+        latest_db = a.read(1)
+    latest_al = reproject_to_grid(latest_db, a.transform, a.crs, dst_transform, dst_crs, ref_db.shape)
 
-    flood = flood_extent(before_db, after_al, thresh_db=args.thresh)
+    flood = flood_extent(ref_db, latest_al, thresh_db=args.thresh)
     flood = filter_min_area(flood, min_px=25)
     try:
-        wc = fetch_worldcover_for_bounds(aoi.bbox, dst_transform, dst_crs, before_db.shape)
-        flood, removed = clean_flood_extent(
-            flood,
-            wc == 80,  # permanent water
-            wc == 50,  # urban
-        )
+        wc = fetch_worldcover_for_bounds(aoi.bbox, dst_transform, dst_crs, ref_db.shape)
+        flood, removed = clean_flood_extent(flood, permanent_water_mask(wc), urban_mask(wc))
         logger.info("context cleaning: %d px left", removed["after_px"])
     except Exception as exc:
         logger.warning("worldcover unavailable, extent NOT cleaned: %s", exc)

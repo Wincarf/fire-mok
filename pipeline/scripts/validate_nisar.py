@@ -6,18 +6,16 @@ import logging
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-
 from pipeline.aoi import get_aoi
 from pipeline.nisar import download_gcov, earthdata_session, gcov_to_cog, search_nisar_gcov
 
-logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 logger = logging.getLogger("validate_nisar")
 
 DATA_DIR = Path(__file__).resolve().parents[2] / "data" / "sar"
 
 
 def main() -> int:
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
     parser = argparse.ArgumentParser()
     parser.add_argument("--aoi", default="guaiba")
     parser.add_argument("--pol", default="HHHH")
@@ -26,22 +24,22 @@ def main() -> int:
 
     session = earthdata_session()
     if session is None:
-        print("skipped: no Earthdata creds (set EARTHDATA_USER/EARTHDATA_PASS or ~/.netrc)")
+        logger.info("skipped: no Earthdata creds (set EARTHDATA_USER/EARTHDATA_PASS or ~/.netrc)")
         return 0
 
     today = datetime.date.today().isoformat()
     scenes = search_nisar_gcov(aoi.bbox, "2026-10-21", today)
-    print(f"found {len(scenes)} GCOV scenes over {aoi.name} since 2026-10-21")
+    logger.info("found %d GCOV scenes over %s since 2026-10-21", len(scenes), aoi.name)
     if not scenes:
         return 0
 
     scene = scenes[0]
-    print(f"scene: {scene.id} @ {scene.datetime}")
+    logger.info("scene: %s @ %s", scene.id, scene.datetime)
     h5 = download_gcov(scene, session, DATA_DIR)
-    print(f"downloaded -> {h5} ({h5.stat().st_size / 1e6:.1f} MB)")
+    logger.info("downloaded -> %s (%.1f MB)", h5, h5.stat().st_size / 1e6)
 
     cog = gcov_to_cog(h5, pol=args.pol)
-    print(f"COG -> {cog}")
+    logger.info("COG -> %s", cog)
 
     try:
         import matplotlib
@@ -57,9 +55,9 @@ def main() -> int:
         plt.colorbar(label="sigma0 (dB)")
         plt.title(f"NISAR GCOV {args.pol} — {scene.datetime[:10]}")
         plt.savefig(png, dpi=120, bbox_inches="tight")
-        print(f"preview -> {png}")
+        logger.info("preview -> %s", png)
     except ImportError:
-        print("matplotlib not installed; skipping preview")
+        logger.info("matplotlib not installed; skipping preview")
 
     return 0
 

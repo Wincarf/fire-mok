@@ -7,18 +7,17 @@ from pathlib import Path
 import numpy as np
 import rasterio
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-
+from pipeline.aoi import get_aoi
 from pipeline.municipalities import exposure_by_municipality, load_municipalities
 from pipeline.population import fetch_pop_density_grid
 
-logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 logger = logging.getLogger("build_municipalities")
 
 DATA = Path(__file__).resolve().parents[2] / "data"
 
 
 def main() -> int:
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
     out_dir = DATA / "vector"
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -35,8 +34,6 @@ def main() -> int:
     with rasterio.open(flood_tif) as src:
         mask = src.read(1) == 1
         transform, crs = src.transform, src.crs
-
-    from pipeline.aoi import get_aoi
 
     aoi = get_aoi("guaiba")
     density = fetch_pop_density_grid(

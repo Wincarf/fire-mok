@@ -1,4 +1,6 @@
 import { STORY } from "../story";
+import { sarSceneDate } from "../format";
+import { SAR_SCENE_AFTER, SAR_SCENE_BEFORE } from "../mapStyle";
 
 type Props = {
   step: number | null;
@@ -16,12 +18,12 @@ export function Timeline({ step, onChapter }: Props) {
           <span className="flex items-center gap-space-xs whitespace-nowrap">
             <span className="w-2 h-2 rounded-full bg-error" />
             <span className="text-on-surface-variant">SAR PEAK</span>
-            <span className="text-on-surface font-medium">11/MAY</span>
+            <span className="text-on-surface font-medium">{sarSceneDate(SAR_SCENE_AFTER).toUpperCase()}</span>
           </span>
           <span className="flex items-center gap-space-xs whitespace-nowrap">
             <span className="w-2 h-2 rounded-full bg-primary" />
             <span className="text-on-surface-variant">RECESSION</span>
-            <span className="text-on-surface font-medium">04/JUN</span>
+            <span className="text-on-surface font-medium">{sarSceneDate(SAR_SCENE_BEFORE).toUpperCase()}</span>
           </span>
         </div>
       </div>

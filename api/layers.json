@@ -1,0 +1,64 @@
+{
+  "sar_before": {
+    "path": "sar/S1A_IW_GRDH_1SDV_20240604T084924_20240604T084953_054171_069681_rtc_vv_db.tif",
+    "render": { "rescale": [-30, 0] },
+    "prerender": true
+  },
+  "sar_after": {
+    "path": "sar/S1A_IW_GRDH_1SDV_20240511T084943_20240511T085008_053821_068A6E_rtc_vv_db.tif",
+    "render": { "rescale": [-30, 0] },
+    "prerender": true
+  },
+  "flood_extent": {
+    "path": "sar/flood_extent_may2024.tif",
+    "render": { "colormap": { "0": [0, 0, 0, 0], "1": [220, 38, 38, 200] } },
+    "prerender": true
+  },
+  "permanent_water": {
+    "path": "context/permanent_water_guaiba.tif"
+  },
+  "urban": {
+    "path": "context/urban_guaiba.tif"
+  },
+  "susceptibility": {
+    "path": "terrain/susceptibility_guaiba.tif",
+    "render": { "colormap": { "0": [0, 0, 0, 0], "1": [37, 99, 235, 140] } },
+    "prerender": true
+  },
+  "hand": {
+    "path": "terrain/hand_guaiba.tif"
+  },
+  "dem": {
+    "path": "terrain/cop_dem_glo30_guaiba.tif"
+  },
+  "choreo_peak": {
+    "path": "sar/choreo_extent_20240511.tif",
+    "render": { "colormap": { "0": [0, 0, 0, 0], "1": [37, 99, 235, 150] } },
+    "prerender": true
+  },
+  "choreo_recession": {
+    "path": "sar/choreo_extent_20240530.tif",
+    "render": { "colormap": { "0": [0, 0, 0, 0], "1": [37, 99, 235, 150] } },
+    "prerender": true
+  },
+  "choreo_calm": {
+    "path": "sar/choreo_extent_20240604.tif",
+    "render": { "colormap": { "0": [0, 0, 0, 0], "1": [37, 99, 235, 150] } },
+    "prerender": true
+  },
+  "nisar_hh": {
+    "path": "nisar/nisar_hh_db.tif",
+    "render": { "rescale": [-30, 0] },
+    "prerender": true
+  },
+  "nisar_lwater": {
+    "path": "nisar/nisar_lwater.tif",
+    "render": { "colormap": { "0": [0, 0, 0, 0], "1": [34, 211, 238, 170] } },
+    "prerender": true
+  },
+  "nisar_diff": {
+    "path": "nisar/nisar_diff.tif",
+    "render": { "colormap": { "0": [0, 0, 0, 0], "1": [220, 38, 38, 160], "2": [34, 211, 238, 190] } },
+    "prerender": true
+  }
+}
