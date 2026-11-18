@@ -20,6 +20,8 @@ import numpy as np
 import rasterio
 from rasterio.warp import Resampling, reproject
 
+from pipeline.raster import reproject_to_grid, write_float32_cog
+
 logger = logging.getLogger(__name__)
 
 WORLDPOP_URL = (
@@ -44,8 +46,6 @@ def density_from_counts(
     if c.max() <= 0:
         return None
     density_src = c / src_px_area
-    from pipeline.raster import reproject_to_grid
-
     density_dst = reproject_to_grid(
         density_src, src_transform, src_crs, dst_transform, dst_crs,
         dst_shape, resampling=Resampling.average,
@@ -75,14 +75,7 @@ def fetch_pop_density_grid(
                 counts = src.read(1, window=win, boundless=True, fill_value=src.nodata or 0)
                 transform = src.window_transform(win)
                 crs = src.crs
-                cache_path.parent.mkdir(parents=True, exist_ok=True)
-                profile = {
-                    "driver": "COG", "height": counts.shape[0], "width": counts.shape[1],
-                    "count": 1, "dtype": "float32", "crs": crs, "transform": transform,
-                    "nodata": np.nan, "compress": "deflate",
-                }
-                with rasterio.open(cache_path, "w", **profile) as dst:
-                    dst.write(counts.astype("float32"), 1)
+                write_float32_cog(counts, transform, crs, cache_path)
         return density_from_counts(counts, transform, crs, dst_transform, dst_crs, dst_shape)
     except Exception as exc:
         logger.warning("population grid unavailable (%s) — uniform-density fallback", exc)

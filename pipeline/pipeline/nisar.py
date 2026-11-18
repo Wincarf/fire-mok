@@ -11,6 +11,7 @@ import numpy as np
 import rasterio
 from rasterio.transform import from_origin
 
+from pipeline.raster import write_float32_cog
 from pipeline.types import Scene
 
 logger = logging.getLogger(__name__)
@@ -122,19 +123,4 @@ def gcov_to_cog(h5_path: Path, pol: str = "HHHH", out: Path | None = None) -> Pa
 
     db = np.where(data > 0, 10.0 * np.log10(np.asarray(data, dtype="float32")), np.nan)
 
-    out.parent.mkdir(parents=True, exist_ok=True)
-    with rasterio.open(
-        out,
-        "w",
-        driver="COG",
-        height=data.shape[0],
-        width=data.shape[1],
-        count=1,
-        dtype="float32",
-        crs=epsg,
-        transform=transform,
-        nodata=np.nan,
-        compress="deflate",
-    ) as dst:
-        dst.write(db.astype("float32"), 1)
-    return out
+    return write_float32_cog(db, transform, f"EPSG:{epsg}", out)

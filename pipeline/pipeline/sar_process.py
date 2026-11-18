@@ -9,6 +9,7 @@ from rasterio.warp import transform_bounds
 from rasterio.windows import from_bounds
 
 from pipeline.aoi import AOI
+from pipeline.raster import write_float32_cog
 from pipeline.types import Scene
 
 logger = logging.getLogger(__name__)
@@ -34,30 +35,10 @@ def _read_aoi_window(url: str, aoi: AOI):
         return np.asarray(data, dtype="float32"), src.window_transform(window), src.crs
 
 
-def _write_cog(data: np.ndarray, transform, crs, out: Path) -> Path:
-    out = Path(out)
-    out.parent.mkdir(parents=True, exist_ok=True)
-    with rasterio.open(
-        out,
-        "w",
-        driver="COG",
-        height=data.shape[0],
-        width=data.shape[1],
-        count=1,
-        dtype="float32",
-        crs=crs,
-        transform=transform,
-        nodata=np.nan,
-        compress="deflate",
-    ) as dst:
-        dst.write(data, 1)
-    return out
-
-
 def crop_to_aoi(url: str, aoi: AOI, out: Path) -> Path:
     """Crop a raster (local path or URL) to the AOI bbox; nodata-fills partial overlap."""
     data, transform, crs = _read_aoi_window(url, aoi)
-    return _write_cog(data, transform, crs, out)
+    return write_float32_cog(data, transform, crs, out)
 
 
 def _band_url(scene: Scene, band: str) -> str:
@@ -73,6 +54,6 @@ def process_scene(scene: Scene, band: str, aoi: AOI, out_dir: Path) -> Path:
     out_dir = Path(out_dir)
     out = out_dir / f"{scene.id}_{band}_db.tif"
     linear, transform, crs = _read_aoi_window(_band_url(scene, band), aoi)
-    _write_cog(to_db(linear), transform, crs, out)
+    write_float32_cog(to_db(linear), transform, crs, out)
     logger.info("processed %s band %s -> %s", scene.id, band, out)
     return out

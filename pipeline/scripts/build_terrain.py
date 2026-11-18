@@ -17,6 +17,7 @@ from shapely.geometry import box
 
 from pipeline.aoi import get_aoi
 from pipeline.municipalities import load_municipalities
+from pipeline.raster import write_float32_cog
 from pipeline.stac import PC_STAC_URL
 from pipeline.terrain import hand, slope_deg, susceptibility, susceptibility_hand
 
@@ -58,13 +59,7 @@ def fetch_dem(aoi, out: Path) -> Path:
         srcs.append(mem.open())
     dem, transform = merge(srcs)
     dem = dem[0]
-    out.parent.mkdir(parents=True, exist_ok=True)
-    with rasterio.open(
-        out, "w", driver="COG", height=dem.shape[0], width=dem.shape[1],
-        count=1, dtype="float32", crs=crs, transform=transform,
-        nodata=np.nan, compress="deflate",
-    ) as ds:
-        ds.write(dem.astype("float32"), 1)
+    write_float32_cog(dem, transform, crs, out)
     logger.info("DEM %s px, CRS %s -> %s", dem.shape, crs, out)
     return out
 
@@ -113,12 +108,7 @@ def main() -> int:
 
     hand_path = ter_dir / "hand_guaiba.tif"
     if hand_ok:
-        with rasterio.open(
-            hand_path, "w", driver="COG", height=hand_arr.shape[0], width=hand_arr.shape[1],
-            count=1, dtype="float32", crs=crs, transform=transform, nodata=np.nan,
-            compress="deflate",
-        ) as ds:
-            ds.write(hand_arr, 1)
+        write_float32_cog(hand_arr, transform, crs, hand_path)
     else:
         logger.warning("skipping %s — HAND unavailable", hand_path)
 

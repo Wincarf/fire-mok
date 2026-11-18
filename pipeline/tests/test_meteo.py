@@ -3,7 +3,7 @@ import numpy as np
 from pipeline.meteo import (
     aggregate_meteo,
     parse_open_meteo,
-    rolling_max,
+    max_window_sum,
 )
 
 
@@ -38,10 +38,10 @@ def test_missing_values_counted_not_imputed():
     assert np.isclose(d["soil_moisture_mean"], 0.30 * 23 / 23)
 
 
-def test_rolling_max():
-    assert rolling_max([1, 5, 2, 0, 9, 1, 1], 3) == 11  # window (2,0,9)
-    assert rolling_max([3, 3], 7) == 6  # window larger than series -> total
-    assert rolling_max([], 7) == 0.0
+def test_max_window_sum():
+    assert max_window_sum([1, 5, 2, 0, 9, 1, 1], 3) == 11  # window (2,0,9)
+    assert max_window_sum([3, 3], 7) == 6  # window larger than series -> total
+    assert max_window_sum([], 7) == 0.0
 
 
 def test_aggregate_meteo_features():

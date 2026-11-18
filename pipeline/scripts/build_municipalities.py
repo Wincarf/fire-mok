@@ -7,6 +7,7 @@ from pathlib import Path
 import numpy as np
 import rasterio
 
+from pipeline.aoi import get_aoi
 from pipeline.municipalities import exposure_by_municipality, load_municipalities
 from pipeline.population import fetch_pop_density_grid
 
@@ -33,8 +34,6 @@ def main() -> int:
     with rasterio.open(flood_tif) as src:
         mask = src.read(1) == 1
         transform, crs = src.transform, src.crs
-
-    from pipeline.aoi import get_aoi
 
     aoi = get_aoi("guaiba")
     density = fetch_pop_density_grid(

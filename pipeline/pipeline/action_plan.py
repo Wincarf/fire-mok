@@ -5,13 +5,12 @@ Strings are English — they reach the UI and the manager-facing report.
 """
 
 from pipeline.types import MuniFeatures, RiskCategory
+from pipeline.util import num_or
 
 SEVERITY_ORDER: list[RiskCategory] = ["low", "moderate", "high", "critical"]
 
 
 def build_action_plan(m: MuniFeatures) -> dict:
-    from pipeline.util import num_or
-
     def _num(key: str, default: float = 0.0) -> float:
         return num_or(m.get(key, default), default)
 

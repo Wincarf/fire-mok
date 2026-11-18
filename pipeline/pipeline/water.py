@@ -18,7 +18,7 @@ def water_mask(db: np.ndarray, thresh_db: float = DEFAULT_THRESH_DB) -> np.ndarr
 
 
 def flood_extent(
-    before_db: np.ndarray, after_db: np.ndarray, thresh_db: float = -15.0
+    before_db: np.ndarray, after_db: np.ndarray, thresh_db: float = DEFAULT_THRESH_DB
 ) -> np.ndarray:
     """Pixels that became water after but were not water before.
 

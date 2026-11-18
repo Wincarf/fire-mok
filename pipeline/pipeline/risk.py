@@ -9,6 +9,7 @@ is the forward-looking flood driver. Missing forecast contributes 0.
 """
 
 from pipeline.types import MuniFeatures, RiskCategory
+from pipeline.util import num_or
 
 PRECIP_CAP_MM = 300.0      # May-2024 peak 7-day totals were ~300-360 mm
 SOIL_CAP = 0.5             # saturation ~0.45-0.5 m3/m3 in the region
@@ -26,8 +27,6 @@ def _clamp(x: float) -> float:
 
 
 def risk_score(f: MuniFeatures) -> float:
-    from pipeline.util import num_or
-
     precip_mm = max(
         num_or(f.get("precip_max7d_mm")),
         num_or(f.get("precip_forecast_max7d_mm")),

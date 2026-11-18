@@ -42,3 +42,24 @@ def write_mask_cog(mask: np.ndarray, src_profile: dict, out: Path) -> Path:
     with rasterio.open(out, "w", **profile) as dst:
         dst.write(mask.astype("uint8"), 1)
     return out
+
+
+def write_float32_cog(data: np.ndarray, transform, crs, out: Path) -> Path:
+    """Write a single-band float32 raster as a compressed COG (NaN nodata)."""
+    out = Path(out)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    with rasterio.open(
+        out,
+        "w",
+        driver="COG",
+        height=data.shape[0],
+        width=data.shape[1],
+        count=1,
+        dtype="float32",
+        crs=crs,
+        transform=transform,
+        nodata=np.nan,
+        compress="deflate",
+    ) as dst:
+        dst.write(np.asarray(data, dtype="float32"), 1)
+    return out

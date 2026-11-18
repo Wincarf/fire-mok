@@ -13,7 +13,7 @@ import logging
 import httpx
 import numpy as np
 
-from pipeline.meteo import rolling_max
+from pipeline.meteo import max_window_sum
 
 logger = logging.getLogger(__name__)
 
@@ -63,16 +63,16 @@ def cross_check_precip(open_meteo_daily: dict[str, float], power_daily: dict[str
     if not dates:
         return {"n_overlap_days": 0, "bias_mm": float("nan"),
                 "max_abs_diff_mm": float("nan"),
-                "max7d_open_meteo_mm": rolling_max(om_vals, 7),
-                "max7d_power_mm": rolling_max(pw_vals, 7)}
+                "max7d_open_meteo_mm": max_window_sum(om_vals, 7),
+                "max7d_power_mm": max_window_sum(pw_vals, 7)}
     om = np.asarray([open_meteo_daily[d] for d in dates], dtype="float32")
     pw = np.asarray([power_daily[d] for d in dates], dtype="float32")
     return {
         "n_overlap_days": len(dates),
         "bias_mm": float(np.mean(pw - om)),
         "max_abs_diff_mm": float(np.max(np.abs(pw - om))),
-        "max7d_open_meteo_mm": rolling_max(om_vals, 7),
-        "max7d_power_mm": rolling_max(pw_vals, 7),
+        "max7d_open_meteo_mm": max_window_sum(om_vals, 7),
+        "max7d_power_mm": max_window_sum(pw_vals, 7),
     }
 
 
@@ -101,7 +101,7 @@ def power_for_point(lat: float, lon: float, start: str, end: str) -> dict:
     vals = list(daily.values())
     return {
         "precip_total_mm": float(np.sum(vals)),
-        "precip_max7d_mm": rolling_max(vals, 7),
+        "precip_max7d_mm": max_window_sum(vals, 7),
         "n_days": len(daily),
         "n_missing": n_missing,
         "daily": daily,

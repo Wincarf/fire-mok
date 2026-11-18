@@ -79,7 +79,8 @@ def parse_open_meteo(payload: dict) -> dict:
     }
 
 
-def rolling_max(vals: list[float], window: int) -> float:
+def max_window_sum(vals: list[float], window: int) -> float:
+    """Largest sum over any contiguous `window`-day span (7d-precip feature)."""
     if not vals:
         return 0.0
     if len(vals) <= window:
@@ -93,7 +94,7 @@ def aggregate_meteo(d: dict) -> dict:
     n_missing = sum(d["missing"].values())
     return {
         "precip_total_mm": d["precip_total_mm"],
-        "precip_max7d_mm": rolling_max(d["precip"], 7),
+        "precip_max7d_mm": max_window_sum(d["precip"], 7),
         "precip_max_day_mm": float(np.max(d["precip"])) if d["precip"] else 0.0,
         "soil_moisture_mean": d["soil_moisture_mean"],
         "soil_moisture_max": float(np.max(d["soil"])) if d["soil"] else np.nan,
@@ -113,11 +114,6 @@ def load_parse(lat: float, lon: float, start: str, end: str) -> dict:
         payload = fetch_open_meteo(lat, lon, start, end)
         key.write_text(json.dumps(payload))
     return parse_open_meteo(payload)
-
-
-def meteo_for_point(lat: float, lon: float, start: str, end: str) -> dict:
-    """Fetch + aggregate for one point, with file cache."""
-    return aggregate_meteo(load_parse(lat, lon, start, end))
 
 
 FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
@@ -143,7 +139,7 @@ def forecast_max7d(lat: float, lon: float, days: int = 7, timeout: float = 60.0)
     vals = r.json().get("daily", {}).get("precipitation_sum") or []
     good = [float(v) for v in vals if v is not None]
     return {
-        "precip_forecast_max7d_mm": rolling_max(good, days),
+        "precip_forecast_max7d_mm": max_window_sum(good, days),
         "n_forecast_days": len(good),
         "raw": json.dumps(vals),
     }
