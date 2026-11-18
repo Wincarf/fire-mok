@@ -42,7 +42,15 @@ async function getJson<T>(path: string, init?: RequestInit): Promise<T> {
   return (await r.json()) as T;
 }
 
-export const fetchMunicipalities = () => getJson<MuniFC>("/api/municipalities");
+export const fetchMunicipalities = async (): Promise<MuniFC> => {
+  const d = await getJson<unknown>("/api/municipalities");
+  // unguarded .features deref / setData on a non-FC payload would crash the map
+  if (!d || typeof d !== "object" || !Array.isArray((d as MuniFC).features)) {
+    console.warn("/api/municipalities: unexpected payload shape", d);
+    throw new Error("/api/municipalities: unexpected payload shape");
+  }
+  return d as MuniFC;
+};
 
 const isPlan = (d: unknown): d is Plan =>
   !!d &&
