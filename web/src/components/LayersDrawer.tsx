@@ -1,11 +1,12 @@
 import type { Vis } from "../vis";
 import { fmtInt, SAR_PLATFORM } from "../format";
 import { RISK_CATEGORIES, RISK_CHIP } from "../risk";
+import type { MuniSummary } from "../stats";
 
 type Props = {
   layers: Vis;
   onToggle: (k: keyof Vis, v: boolean) => void;
-  summary: { exposed: number; critical: number };
+  summary: MuniSummary;
   lastPass: string;
 };
 
