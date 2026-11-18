@@ -21,16 +21,22 @@ def main() -> int:
     meteo = gpd.read_file(vec / "municipalities_meteo_2024-04-15_2024-05-31.geojson")
     terr = pd.read_csv(vec / "municipalities_terrain.csv", dtype={"code": str})
 
+    # precip_forecast_max7d_mm only exists when build_meteo ran with --forecast
+    meteo_cols = [
+        "precip_total_mm", "precip_max7d_mm", "precip_forecast_max7d_mm",
+        "soil_moisture_mean", "missing_frac",
+    ]
     muni = expo[["code", "name", "population", "flooded_m2", "flood_frac", "pop_exposed", "geometry"]].merge(
-        meteo[["code", "precip_total_mm", "precip_max7d_mm", "soil_moisture_mean", "missing_frac"]].drop(columns="geometry", errors="ignore"),
+        meteo[["code"] + [c for c in meteo_cols if c in meteo.columns]].drop(columns="geometry", errors="ignore"),
         on="code", how="left",
     ).merge(
         terr[["code", "sus_frac", "elev_mean", "slope_mean"]], on="code", how="left"
-    ).fillna({"precip_max7d_mm": 0, "soil_moisture_mean": 0, "sus_frac": 0, "flood_frac": 0})
+    ).fillna({"precip_max7d_mm": 0, "precip_forecast_max7d_mm": 0, "soil_moisture_mean": 0, "sus_frac": 0, "flood_frac": 0})
 
     muni["risk"] = muni.apply(
         lambda r: risk_score({
             "precip_max7d_mm": r.precip_max7d_mm,
+            "precip_forecast_max7d_mm": r.get("precip_forecast_max7d_mm"),
             "soil_moisture_mean": r.soil_moisture_mean,
             "sus_frac": r.sus_frac,
             "flood_frac": r.flood_frac,
