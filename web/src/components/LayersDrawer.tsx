@@ -1,5 +1,5 @@
 import type { Vis } from "../vis";
-import { SAR_PLATFORM } from "../format";
+import { fmtInt, SAR_PLATFORM } from "../format";
 import { RISK_CATEGORIES, RISK_CHIP } from "../risk";
 
 type Props = {
@@ -70,7 +70,7 @@ export function LayersDrawer({ layers, onToggle, summary, lastPass }: Props) {
           <div className="mt-space-xs p-space-sm rounded-lg bg-surface-container-low">
             <div className="flex items-baseline justify-between">
               <span className="font-metric-lg text-metric-lg text-on-surface">
-                ~{summary.exposed.toLocaleString("en-US")}
+                ~{fmtInt(summary.exposed)}
               </span>
               <span className="font-label-mono-xs text-label-mono-xs text-tertiary-container font-semibold uppercase">
                 {summary.critical} at critical risk
