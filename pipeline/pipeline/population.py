@@ -18,7 +18,8 @@ from pathlib import Path
 
 import numpy as np
 import rasterio
-from rasterio.warp import Resampling, reproject
+from rasterio.warp import Resampling, reproject, transform_bounds
+from rasterio.windows import from_bounds
 
 from pipeline.raster import reproject_to_grid, write_float32_cog
 
@@ -68,9 +69,6 @@ def fetch_pop_density_grid(
                 counts, transform, crs = src.read(1), src.transform, src.crs
         else:
             with rasterio.open(f"/vsicurl/{WORLDPOP_URL}") as src:
-                from rasterio.windows import from_bounds
-                from rasterio.warp import transform_bounds
-
                 win = from_bounds(*bbox_4326, transform=src.transform)
                 counts = src.read(1, window=win, boundless=True, fill_value=src.nodata or 0)
                 transform = src.window_transform(win)

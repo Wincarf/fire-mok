@@ -11,7 +11,7 @@ import rasterio.io
 from pystac_client import Client
 from rasterio.features import geometry_mask
 from rasterio.merge import merge
-from rasterio.warp import transform_bounds
+from rasterio.warp import Resampling, calculate_default_transform, reproject, transform_bounds
 from rasterio.windows import from_bounds
 from shapely.geometry import box
 
@@ -77,8 +77,6 @@ def main() -> int:
         transform, crs = src.transform, src.crs
     if crs.is_geographic:
         # reproject DEM to metric UTM before slope (geomaster gate: units must agree)
-        from rasterio.warp import Resampling, calculate_default_transform, reproject
-
         dst_crs = "EPSG:32722"
         dst_transform, w, h = calculate_default_transform(crs, dst_crs, dem.shape[1], dem.shape[0], *src.bounds)
         dem_m = np.full((h, w), np.nan, dtype="float32")
