@@ -22,7 +22,7 @@ export const SAR_SCENE_BEFORE =
 export const SAR_SCENE_AFTER =
   "S1A_IW_GRDH_1SDV_20240511T084943_20240511T085008_053821_068A6E_rtc_vv_db.tif";
 
-const FLOOD_CMAP = encodeURIComponent(
+export const FLOOD_CMAP = encodeURIComponent(
   JSON.stringify({ 0: [0, 0, 0, 0], 1: [220, 38, 38, 200] })
 );
 const SUS_CMAP = encodeURIComponent(

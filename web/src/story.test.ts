@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { STORY } from "./story";
 
 const VIS_KEYS = ["flood", "sus", "muni"];
+const LANGS = ["pt", "en"] as const;
 
 describe("story script", () => {
   it("has 6 steps", () => {
@@ -27,10 +28,12 @@ describe("story script", () => {
     }
   });
 
-  it("every step has non-empty title and text", () => {
+  it("every step has non-empty title and text in both languages", () => {
     for (const s of STORY) {
-      expect(s.title.length).toBeGreaterThan(0);
-      expect(s.text.length).toBeGreaterThan(0);
+      for (const l of LANGS) {
+        expect(s.title[l].length).toBeGreaterThan(0);
+        expect(s.text[l].length).toBeGreaterThan(0);
+      }
     }
   });
 });

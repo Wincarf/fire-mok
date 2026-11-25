@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import * as maplibregl from "maplibre-gl";
 import type { Vis } from "./vis";
 import { STORY, type Step } from "./story";
+import { detectLang, saveLang, type Lang } from "./i18n";
+import { Landing } from "./landing/Landing";
 import { StoryOverlay } from "./components/StoryOverlay";
 import { Header } from "./components/Header";
 import { ChoreoBar } from "./components/ChoreoBar";
@@ -64,7 +66,9 @@ export default function App() {
   const [playing, setPlaying] = useState(false);
   const [cardBeat, setCardBeat] = useState<number | null>(null);
   const [split, setSplit] = useState(50);
-  const [step, setStep] = useState<number | null>(0);
+  const [step, setStep] = useState<number | null>(null);
+  const [lang, setLang] = useState<Lang>(detectLang);
+  const [entered, setEntered] = useState(false);
   const [tiler, setTiler] = useState<"loading" | "online" | "offline">("loading");
   const [tilerMs, setTilerMs] = useState<number | null>(null);
   const [coords, setCoords] = useState<{ lng: number; lat: number } | null>(null);
@@ -239,6 +243,16 @@ export default function App() {
     floodPolygonsAvailable().then(setFloodOk);
   }, []);
 
+  // language: persist choice + keep <html lang> and the tab title in sync
+  useEffect(() => {
+    saveLang(lang);
+    document.documentElement.lang = lang === "pt" ? "pt-BR" : "en";
+    document.title =
+      lang === "pt"
+        ? "Fire Mok — Monitoramento de Enchentes"
+        : "Fire Mok — Flood Monitoring";
+  }, [lang]);
+
   // guided story — each step drives camera, layers, selection
   useEffect(() => {
     if (step === null) return;
@@ -363,7 +377,7 @@ export default function App() {
             onExportFlood={() => downloadJson("/api/flood_polygons", "flooded_areas_may2024.geojson")}
           />
         )}
-        {step !== null && <Timeline step={step} onChapter={setStep} />}
+        {step !== null && <Timeline step={step} lang={lang} onChapter={setStep} />}
         {step === null && choreo && (
           <ChoreoBar
             beats={choreo.beats}
@@ -382,6 +396,7 @@ export default function App() {
             index={step}
             total={STORY.length}
             step={STORY[step]}
+            lang={lang}
             onPrev={() => setStep((s) => (s === null || s === 0 ? s : s - 1))}
             onNext={() => setStep((s) => (s === null ? null : s >= STORY.length - 1 ? null : s + 1))}
             onSkip={exitStory}
@@ -389,6 +404,18 @@ export default function App() {
           />
         )}
       </main>
+
+      {!entered && (
+        <Landing
+          lang={lang}
+          onLang={setLang}
+          choreo={choreo}
+          onEnter={() => {
+            setEntered(true);
+            setStep(0);
+          }}
+        />
+      )}
     </div>
   );
 }

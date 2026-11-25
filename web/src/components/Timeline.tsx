@@ -1,28 +1,31 @@
 import { STORY } from "../story";
+import { STORY_UI, type Lang } from "../i18n";
 import { sarSceneDate } from "../format";
 import { SAR_SCENE_AFTER, SAR_SCENE_BEFORE } from "../mapStyle";
 
 type Props = {
   step: number | null;
+  lang: Lang;
   onChapter: (i: number) => void;
 };
 
-export function Timeline({ step, onChapter }: Props) {
+export function Timeline({ step, lang, onChapter }: Props) {
+  const ui = STORY_UI[lang];
   return (
     <div className="absolute bottom-3 inset-x-3 z-30 rounded-xl bg-surface-container-lowest/85 backdrop-blur-xl border border-outline-variant px-space-md py-space-sm">
       <div className="flex items-center justify-between gap-space-md">
         <span className="font-label-mono-xs text-label-mono-xs text-on-surface-variant uppercase tracking-wider whitespace-nowrap">
-          Timeline · May–Jun 2024
+          {ui.timelineTitle}
         </span>
         <div className="flex items-center gap-space-md font-label-mono-xs text-label-mono-xs">
           <span className="flex items-center gap-space-xs whitespace-nowrap">
             <span className="w-2 h-2 rounded-full bg-error" />
-            <span className="text-on-surface-variant">SAR PEAK</span>
+            <span className="text-on-surface-variant">{ui.sarPeak}</span>
             <span className="text-on-surface font-medium">{sarSceneDate(SAR_SCENE_AFTER).toUpperCase()}</span>
           </span>
           <span className="flex items-center gap-space-xs whitespace-nowrap">
             <span className="w-2 h-2 rounded-full bg-primary" />
-            <span className="text-on-surface-variant">RECESSION</span>
+            <span className="text-on-surface-variant">{ui.recession}</span>
             <span className="text-on-surface font-medium">{sarSceneDate(SAR_SCENE_BEFORE).toUpperCase()}</span>
           </span>
         </div>
@@ -39,7 +42,7 @@ export function Timeline({ step, onChapter }: Props) {
                 key={i}
                 type="button"
                 onClick={() => onChapter(i)}
-                title={`${i + 1}. ${s.title}`}
+                title={`${i + 1}. ${s.title[lang]}`}
                 className="flex-1 flex flex-col items-center gap-space-xs group min-w-0"
               >
                 <span
@@ -64,7 +67,7 @@ export function Timeline({ step, onChapter }: Props) {
                     active ? "text-primary" : "text-on-surface-variant group-hover:text-on-surface"
                   }`}
                 >
-                  {s.title}
+                  {s.title[lang]}
                 </span>
               </button>
             );
